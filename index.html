@@ -39,8 +39,8 @@
     button:hover{transform:translateY(-1px);border-color:rgba(109,211,255,.45);background:rgba(13,31,55,.84)}
     button.primary{background:linear-gradient(135deg,rgba(109,211,255,.18),rgba(94,127,255,.18));border-color:rgba(109,211,255,.4)}
 
-    .scene{position:absolute;inset:0;padding:92px 34px 34px;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;opacity:0;transform:scale(1.04);transition:opacity 1s ease, transform 1s ease;overflow-y:auto}
-    .scene.active{opacity:1;transform:scale(1)}
+    .scene{position:absolute;inset:0;padding:92px 34px 34px;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;opacity:0;transform:scale(1.02);transition:opacity .85s ease, transform .85s ease;overflow-y:auto;visibility:hidden;pointer-events:none;z-index:1}
+    .scene.active{opacity:1;transform:scale(1);visibility:visible;pointer-events:auto;z-index:3}
     .scene:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,11,20,.18),rgba(5,11,20,.55))}
 
     .left,.right{position:relative;z-index:2;min-height:0}
@@ -62,15 +62,16 @@
     .mini-tag{position:absolute;top:22px;right:22px;padding:10px 12px;border-radius:999px;background:rgba(7,16,29,.65);border:1px solid rgba(255,255,255,.09);font-size:11px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
 
     .map-wrap{position:absolute;inset:28px 24px 28px 24px;border-radius:22px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.08);overflow:hidden}
-    .india-outline{position:absolute;right:4%;top:10%;width:42%;opacity:.25;filter:drop-shadow(0 0 20px rgba(109,211,255,.3))}
+    .map-wrap:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 42% 44%,rgba(109,211,255,.12),transparent 35%);pointer-events:none}
+    .india-outline{position:absolute;left:21%;top:8%;width:56%;opacity:.55;filter:drop-shadow(0 0 28px rgba(109,211,255,.42))}
     .network{position:absolute;inset:0}
     .warehouse,.customer-node{position:absolute;width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 7px rgba(109,211,255,.13), 0 0 18px rgba(109,211,255,.55)}
     .customer-node{background:var(--accent-2);box-shadow:0 0 0 7px rgba(147,255,182,.11),0 0 16px rgba(147,255,182,.45)}
-    .label{position:absolute;font-size:12px;color:#dfeaff;transform:translate(18px,-2px);white-space:nowrap}
+    .label{position:absolute;font-size:12px;color:#dfeaff;transform:translate(18px,-2px);white-space:nowrap;text-shadow:0 2px 6px rgba(0,0,0,.55)}
     .route{position:absolute;height:2px;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(109,211,255,.9),rgba(255,255,255,.08));transform-origin:left center;opacity:.9}
     .truck{position:absolute;width:14px;height:14px;background:linear-gradient(135deg,var(--accent-3),#ff9f43);border-radius:4px;box-shadow:0 0 12px rgba(255,209,102,.7)}
 
-    .chart-card{position:absolute;left:24px;right:24px;bottom:24px;height:42%;padding:18px}
+    .chart-card{position:absolute;left:24px;right:24px;bottom:24px;height:34%;padding:18px;background:rgba(7,18,33,.82)}
     .chart-title{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px}
     .chart-title h3{margin:0;font-size:16px}
     .chart-title span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
@@ -376,15 +377,15 @@ let activeCaptionTimer = null;
 
 function buildNetwork(){
   const nodes = [
-    {x:18,y:21,label:'Delhi Hub',cls:'warehouse'},
-    {x:22,y:42,label:'Mumbai DC',cls:'warehouse'},
-    {x:42,y:34,label:'Nagpur',cls:'warehouse'},
-    {x:60,y:56,label:'Bengaluru',cls:'warehouse'},
-    {x:72,y:31,label:'Kolkata',cls:'warehouse'},
-    {x:80,y:50,label:'Chennai Port',cls:'customer-node'}
+    {x:46,y:20,label:'Delhi Hub',cls:'warehouse'},
+    {x:37,y:44,label:'Mumbai DC',cls:'warehouse'},
+    {x:46,y:40,label:'Nagpur',cls:'warehouse'},
+    {x:46,y:62,label:'Bengaluru',cls:'warehouse'},
+    {x:62,y:39,label:'Kolkata',cls:'warehouse'},
+    {x:52,y:71,label:'Chennai Port',cls:'customer-node'}
   ];
   const routes = [
-    [18,21,22,42],[18,21,42,34],[42,34,60,56],[42,34,72,31],[60,56,80,50],[22,42,60,56]
+    [46,20,46,40],[46,20,62,39],[37,44,46,40],[46,40,46,62],[46,62,52,71],[62,39,52,71]
   ];
   nodes.forEach(n=>{
     const d=document.createElement('div');
