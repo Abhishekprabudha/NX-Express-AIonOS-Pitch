@@ -55,7 +55,7 @@
     .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.2em;color:var(--accent-2);margin-bottom:12px}
     .title{font-size:clamp(38px,5vw,66px);line-height:.94;font-weight:800;letter-spacing:-.04em;margin:0 0 14px;max-width:760px}
     .subtitle{font-size:19px;line-height:1.45;color:var(--muted);max-width:720px;margin:0}
-    .caption{position:absolute;left:34px;right:34px;bottom:30px;padding:18px 22px;background:rgba(3,8,16,.5);border:1px solid rgba(255,255,255,.08);border-radius:18px;font-size:18px;line-height:1.5;color:#f2f7ff}
+    .caption{display:none}
 
     .metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px}
     .metric{padding:18px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:20px}
@@ -106,7 +106,6 @@
 
     @media (max-width: 1100px){
       .scene{grid-template-columns:1fr;grid-template-rows:auto 1fr;overflow:auto}
-      .caption{position:static;margin-top:24px}
       .metrics-grid,.ops-grid,.ask-list{grid-template-columns:1fr}
       .timeline{bottom:8px}
     }
@@ -365,6 +364,8 @@ const restartBtn = document.getElementById('restartBtn');
 const network = document.getElementById('network');
 
 const BASE_WORDS_PER_SEC = 2.85;
+const VOICE_PITCH_MULTIPLIER = 1.4;
+const VOICE_RATE_MULTIPLIER = 1.4;
 const sceneNarration = scenes.map(scene => scene.querySelector('.caption').dataset.caption);
 const estimatedSceneDurations = sceneNarration.map(text => Math.max(7, text.trim().split(/\s+/).length / BASE_WORDS_PER_SEC));
 const totalDuration = estimatedSceneDurations.reduce((sum,d)=>sum + d,0) + 3.4;
@@ -582,8 +583,8 @@ function speakText(text, cfg = {}, onEnd){
     return null;
   }
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = cfg.rate ?? 1.06;
-  u.pitch = cfg.pitch ?? 1.42;
+  u.rate = Math.min(10, (cfg.rate ?? 1.06) * VOICE_RATE_MULTIPLIER);
+  u.pitch = Math.min(2, (cfg.pitch ?? 1.42) * VOICE_PITCH_MULTIPLIER);
   u.volume = cfg.volume ?? 1;
   const voice = pickEnergeticFemaleVoice();
   if(voice) u.voice = voice;
