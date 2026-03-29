@@ -39,13 +39,13 @@
     button:hover{transform:translateY(-1px);border-color:rgba(109,211,255,.45);background:rgba(13,31,55,.84)}
     button.primary{background:linear-gradient(135deg,rgba(109,211,255,.18),rgba(94,127,255,.18));border-color:rgba(109,211,255,.4)}
 
-    .scene{position:absolute;inset:0;padding:92px 34px 34px;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;opacity:0;transform:scale(1.04);transition:opacity 1s ease, transform 1s ease}
+    .scene{position:absolute;inset:0;padding:92px 34px 34px;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;opacity:0;transform:scale(1.04);transition:opacity 1s ease, transform 1s ease;overflow-y:auto}
     .scene.active{opacity:1;transform:scale(1)}
     .scene:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,11,20,.18),rgba(5,11,20,.55))}
 
     .left,.right{position:relative;z-index:2;min-height:0}
     .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);backdrop-filter:blur(18px);box-shadow:var(--shadow)}
-    .hero{padding:34px;min-height:100%;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;position:relative}
+    .hero{padding:34px;min-height:100%;display:flex;flex-direction:column;justify-content:flex-end;overflow-y:auto;position:relative}
     .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.2em;color:var(--accent-2);margin-bottom:12px}
     .title{font-size:clamp(38px,5vw,66px);line-height:.94;font-weight:800;letter-spacing:-.04em;margin:0 0 14px;max-width:760px}
     .subtitle{font-size:19px;line-height:1.45;color:var(--muted);max-width:720px;margin:0}
@@ -101,6 +101,13 @@
     @media (max-width: 1100px){
       .scene{grid-template-columns:1fr;grid-template-rows:auto 1fr;overflow:auto}
       .metrics-grid,.ops-grid,.ask-list{grid-template-columns:1fr}
+    }
+    @media (max-height: 860px){
+      .scene{padding:84px 24px 24px;gap:20px}
+      .hero,.visual,.flow-box,.ops-box,.ask-box{padding:20px}
+      .title{font-size:clamp(32px,4.2vw,52px)}
+      .metric .k{font-size:30px}
+      .ask-box .big-ask{font-size:40px}
     }
   </style>
 </head>
