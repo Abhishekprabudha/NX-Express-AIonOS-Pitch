@@ -371,8 +371,10 @@ let playing = false;
 let lastTs = 0;
 let sceneElapsed = 0;
 let utterance = null;
+let narrationStarted = false;
 
 const sceneNarration = scenes.map(scene => scene.querySelector('.caption').dataset.caption);
+const narrationTrack = sceneNarration.join(' ');
 
 function buildNetwork(){
   const nodes = [
@@ -546,7 +548,6 @@ function showScene(index){
   sceneElapsed = 0;
   const cap = scenes[index].querySelector('.caption');
   typeCaption(cap, cap.dataset.caption);
-  speak(sceneNarration[index]);
 }
 
 function typeCaption(el, text){
@@ -562,14 +563,26 @@ function typeCaption(el, text){
 
 function speak(text){
   if(!('speechSynthesis' in window)) return;
+  if(!text) return;
   window.speechSynthesis.cancel();
   utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.93;
-  utterance.pitch = 0.98;
+  utterance.rate = 1.08;
+  utterance.pitch = 1.35;
   utterance.volume = 1;
-  const voice = speechSynthesis.getVoices().find(v=>/Google US English|Microsoft David|Samantha|Aria/i.test(v.name)) || speechSynthesis.getVoices()[0];
+  const voices = speechSynthesis.getVoices();
+  const preferredFemaleVoice = voices.find(v=>/Aria|Jenny|Sonia|Samantha|Zira|Google UK English Female|Google US English Female/i.test(v.name))
+    || voices.find(v=>/female/i.test(v.name))
+    || voices[0];
+  const energeticStyleVoice = voices.find(v=>/Aria|Jenny|Sonia|Samantha|Zira/i.test(v.name));
+  const voice = energeticStyleVoice || preferredFemaleVoice;
   if(voice) utterance.voice = voice;
   speechSynthesis.speak(utterance);
+}
+
+function startNarrationIfNeeded(){
+  if(narrationStarted) return;
+  narrationStarted = true;
+  speak(narrationTrack);
 }
 
 function tick(ts){
@@ -588,11 +601,14 @@ function tick(ts){
 }
 
 function play(){
-  if(playing) return; playing=true; lastTs=0; requestAnimationFrame(tick);
+  if(playing) return;
+  startNarrationIfNeeded();
+  playing=true; lastTs=0; requestAnimationFrame(tick);
 }
 function pause(){ playing=false; window.speechSynthesis?.pause(); }
 function restart(){
   playing=false; elapsed=0; currentScene=0; lastTs=0; timelineFill.style.width='0%';
+  narrationStarted = false;
   window.speechSynthesis?.cancel(); showScene(0); play();
 }
 
