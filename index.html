@@ -570,10 +570,10 @@ function typeCaption(el, text, sceneDurationSec = 10){
   }, intervalMs);
 }
 
-function pickEnergeticFemaleVoice(){
+function pickEnergeticMaleVoice(){
   const voices = speechSynthesis.getVoices();
-  return voices.find(v=>/Aria|Jenny|Sonia|Samantha|Zira|Google US English Female|Google UK English Female/i.test(v.name))
-    || voices.find(v=>/female|woman|feminine/i.test(v.name))
+  return voices.find(v=>/David|Guy|Ryan|Brian|Tom|Alex|Google US English Male|Google UK English Male|Microsoft Mark|Microsoft David/i.test(v.name))
+    || voices.find(v=>/male|man|masculine/i.test(v.name))
     || voices[0];
 }
 
@@ -584,9 +584,9 @@ function speakText(text, cfg = {}, onEnd){
   }
   const u = new SpeechSynthesisUtterance(text);
   u.rate = Math.min(10, (cfg.rate ?? 1.06) * VOICE_RATE_MULTIPLIER);
-  u.pitch = Math.min(2, (cfg.pitch ?? 1.42) * VOICE_PITCH_MULTIPLIER);
+  u.pitch = Math.min(2, (cfg.pitch ?? 1.2) * VOICE_PITCH_MULTIPLIER);
   u.volume = cfg.volume ?? 1;
-  const voice = pickEnergeticFemaleVoice();
+  const voice = pickEnergeticMaleVoice();
   if(voice) u.voice = voice;
   if(typeof onEnd === 'function') u.onend = onEnd;
   speechSynthesis.speak(u);
@@ -600,7 +600,7 @@ function speakScene(sceneIndex){
     ? 'Hi everyone, welcome. Let\'s dive in with energy.'
     : '';
   const payload = `${energeticLead} ${baseText}`.trim();
-  const pitch = 1.35 + ((sceneIndex % 3) * 0.09);
+  const pitch = 1.18 + ((sceneIndex % 3) * 0.08);
   const rate = 1.02 + ((sceneIndex % 2) * 0.05);
 
   narrationRunning = true;
@@ -621,7 +621,7 @@ function startNarrationIfNeeded(){
   narrationStarted = true;
   if('speechSynthesis' in window){
     window.speechSynthesis.cancel();
-    introUtterance = speakText('Hello and welcome. You are about to hear a bright, confident, high-energy walkthrough.', { pitch: 1.48, rate: 1.04, volume: 1 }, () => {
+    introUtterance = speakText('Hello and welcome. You are about to hear a confident, high-energy walkthrough.', { pitch: 1.22, rate: 1.04, volume: 1 }, () => {
       introUtterance = null;
       if(playing) speakScene(currentScene);
     });
