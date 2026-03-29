@@ -63,15 +63,17 @@
 
     .map-wrap{position:absolute;inset:28px 24px 28px 24px;border-radius:22px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.08);overflow:hidden}
     .map-wrap:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 42% 44%,rgba(109,211,255,.12),transparent 35%);pointer-events:none}
-    .india-outline{position:absolute;left:21%;top:8%;width:56%;opacity:.55;filter:drop-shadow(0 0 28px rgba(109,211,255,.42))}
-    .network{position:absolute;inset:0}
+    .map-region{position:absolute;left:18px;right:18px;top:18px;bottom:41%;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,rgba(7,20,36,.42),rgba(7,20,36,.18));border:1px solid rgba(255,255,255,.08)}
+    .india-outline{position:absolute;left:18%;top:6%;width:64%;height:88%;opacity:.82;filter:drop-shadow(0 0 32px rgba(109,211,255,.55))}
+    .network{position:absolute;inset:0;z-index:2}
     .warehouse,.customer-node{position:absolute;width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 7px rgba(109,211,255,.13), 0 0 18px rgba(109,211,255,.55)}
     .customer-node{background:var(--accent-2);box-shadow:0 0 0 7px rgba(147,255,182,.11),0 0 16px rgba(147,255,182,.45)}
     .label{position:absolute;font-size:12px;color:#dfeaff;transform:translate(18px,-2px);white-space:nowrap;text-shadow:0 2px 6px rgba(0,0,0,.55)}
-    .route{position:absolute;height:2px;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(109,211,255,.9),rgba(255,255,255,.08));transform-origin:left center;opacity:.9}
-    .truck{position:absolute;width:14px;height:14px;background:linear-gradient(135deg,var(--accent-3),#ff9f43);border-radius:4px;box-shadow:0 0 12px rgba(255,209,102,.7)}
+    .route{position:absolute;height:3px;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(109,211,255,.96),rgba(255,255,255,.08));transform-origin:left center;opacity:.98}
+    .truck{position:absolute;width:16px;height:16px;background:linear-gradient(135deg,var(--accent-3),#ff9f43);border-radius:4px;box-shadow:0 0 14px rgba(255,209,102,.82);z-index:3}
+    .package-ping{position:absolute;width:8px;height:8px;border-radius:50%;background:#fff4cc;box-shadow:0 0 10px rgba(255,234,160,.9);z-index:3}
 
-    .chart-card{position:absolute;left:24px;right:24px;bottom:24px;height:34%;padding:18px;background:rgba(7,18,33,.82)}
+    .chart-card{position:absolute;left:18px;right:18px;bottom:18px;height:35%;padding:16px;background:rgba(7,18,33,.88);z-index:3}
     .chart-title{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px}
     .chart-title h3{margin:0;font-size:16px}
     .chart-title span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
@@ -162,10 +164,12 @@
           <div class="grid-bg"></div>
           <div class="mini-tag">Footprint + growth narrative</div>
           <div class="map-wrap">
-            <svg class="india-outline" viewBox="0 0 200 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M77 9l18 7 18 5 14 13 8 18 13 11 6 15-2 23 13 15-10 11 8 16-8 7-11-5-9 5-3 14-15 13-15 29-14 4-6-8 2-14-10-8-10-26-7-5-16 5-6-10 7-12-8-8 7-9-3-10-16-12-5-18 15-21 18-10 10-17z" stroke="rgba(109,211,255,.9)" stroke-width="2"/>
-            </svg>
-            <div class="network" id="network"></div>
+            <div class="map-region">
+              <svg class="india-outline" viewBox="0 0 200 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M77 9l18 7 18 5 14 13 8 18 13 11 6 15-2 23 13 15-10 11 8 16-8 7-11-5-9 5-3 14-15 13-15 29-14 4-6-8 2-14-10-8-10-26-7-5-16 5-6-10 7-12-8-8 7-9-3-10-16-12-5-18 15-21 18-10 10-17z" stroke="rgba(109,211,255,.95)" stroke-width="2.4"/>
+              </svg>
+              <div class="network" id="network"></div>
+            </div>
             <div class="chart-card panel">
               <div class="chart-title"><h3>India scale pressure</h3><span>complexity index</span></div>
               <canvas id="chart1"></canvas>
@@ -407,18 +411,22 @@ function buildNetwork(){
     const t=document.createElement('div');
     t.className='truck';
     network.appendChild(t);
+    const p=document.createElement('div');
+    p.className='package-ping';
+    network.appendChild(p);
     animateTruck(t,x1,y1,x2,y2, 4500 + i*700);
+    animateTruck(p,x1,y1,x2,y2, 3000 + i*520, 4);
   });
 }
 
-function animateTruck(el,x1,y1,x2,y2,dur){
+function animateTruck(el,x1,y1,x2,y2,dur, offset=7){
   let start = performance.now() + Math.random()*2000;
   function step(ts){
     const p=((ts-start)%dur+dur)%dur/dur;
     const x = x1 + (x2-x1)*p;
     const y = y1 + (y2-y1)*p;
-    el.style.left = `calc(${x}% - 7px)`;
-    el.style.top = `calc(${y}% - 7px)`;
+    el.style.left = `calc(${x}% - ${offset}px)`;
+    el.style.top = `calc(${y}% - ${offset}px)`;
     requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -531,8 +539,8 @@ function wrapText(ctx,text,x,y,maxWidth,lineHeight){
 
 function resizeAllCharts(){
   drawLineChart('chart1',[
-    {label:'Network volume',data:[42,48,53,61,69,76],color1:'#6dd3ff',color2:'#8b8cff'},
-    {label:'Operational complexity',data:[36,44,52,66,78,92],color1:'#93ffb6',color2:'#49d7a5'}
+    {label:'Network volume',data:[38,47,57,68,78,88],color1:'#6dd3ff',color2:'#8b8cff'},
+    {label:'Operational complexity',data:[32,52,76,102,131,164],color1:'#93ffb6',color2:'#49d7a5'}
   ]);
   drawLineChart('chart2',[
     {label:'OTIF confidence',data:[62,66,71,77,84,91],color1:'#93ffb6',color2:'#45d39b'},
