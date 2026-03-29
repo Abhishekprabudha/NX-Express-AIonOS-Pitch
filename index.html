@@ -39,13 +39,7 @@
     button:hover{transform:translateY(-1px);border-color:rgba(109,211,255,.45);background:rgba(13,31,55,.84)}
     button.primary{background:linear-gradient(135deg,rgba(109,211,255,.18),rgba(94,127,255,.18));border-color:rgba(109,211,255,.4)}
 
-    .timeline{position:absolute;left:24px;right:24px;bottom:18px;height:58px;display:flex;align-items:flex-end;z-index:32}
-    .timeline-shell{width:100%;padding:12px 14px;background:rgba(8,18,33,.55);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
-    .timeline-track{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;position:relative}
-    .timeline-fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--accent),#8aa7ff,var(--accent-2));box-shadow:0 0 30px rgba(109,211,255,.45)}
-    .timeline-labels{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-
-    .scene{position:absolute;inset:0;padding:92px 34px 94px;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;opacity:0;transform:scale(1.04);transition:opacity 1s ease, transform 1s ease}
+    .scene{position:absolute;inset:0;padding:92px 34px 34px;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;opacity:0;transform:scale(1.04);transition:opacity 1s ease, transform 1s ease}
     .scene.active{opacity:1;transform:scale(1)}
     .scene:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,11,20,.18),rgba(5,11,20,.55))}
 
@@ -107,7 +101,6 @@
     @media (max-width: 1100px){
       .scene{grid-template-columns:1fr;grid-template-rows:auto 1fr;overflow:auto}
       .metrics-grid,.ops-grid,.ask-list{grid-template-columns:1fr}
-      .timeline{bottom:8px}
     }
   </style>
 </head>
@@ -347,17 +340,10 @@
       </div>
     </section>
 
-    <div class="timeline">
-      <div class="timeline-shell">
-        <div class="timeline-track"><div class="timeline-fill" id="timelineFill"></div></div>
-        <div class="timeline-labels"><span>Opening</span><span>Customer story</span><span>Pressure points</span><span>AIonOS outcomes</span><span>Clear ask</span></div>
-      </div>
-    </div>
   </div>
 
 <script>
 const scenes = [...document.querySelectorAll('.scene')];
-const timelineFill = document.getElementById('timelineFill');
 const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const restartBtn = document.getElementById('restartBtn');
@@ -633,7 +619,6 @@ function advanceScene(){
   if(currentScene>=scenes.length){
     playing=false;
     currentScene=scenes.length-1;
-    timelineFill.style.width='100%';
     return;
   }
   showScene(currentScene);
@@ -648,7 +633,6 @@ function tick(ts){
   lastTs=ts;
   elapsed+=delta;
   const pct=Math.min(100,(elapsed/totalDuration)*100);
-  timelineFill.style.width=pct+'%';
 
   if(!('speechSynthesis' in window) && elapsed - sceneStartElapsed >= (estimatedSceneDurations[currentScene] || 10)){
     advanceScene();
@@ -684,7 +668,6 @@ function restart(){
   narrationRunning = false;
   utterance = null;
   introUtterance = null;
-  timelineFill.style.width='0%';
   window.speechSynthesis?.cancel();
   showScene(0);
   play();
