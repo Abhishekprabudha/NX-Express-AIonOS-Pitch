@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIonOS × NX Group | Motion Narrative</title>
+  <style>
+    :root{
+      --bg:#05111f;
+      --panel:rgba(10,24,43,.68);
+      --panel-2:rgba(13,31,55,.86);
+      --line:rgba(129,178,255,.24);
+      --text:#eaf2ff;
+      --muted:#9db1cc;
+      --accent:#6dd3ff;
+      --accent-2:#93ffb6;
+      --accent-3:#ffd166;
+      --danger:#ff6b7a;
+      --shadow:0 20px 80px rgba(0,0,0,.35);
+      --radius:26px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:radial-gradient(circle at top left,#0a1f39 0%,#071120 40%,#050b14 100%);color:var(--text);font-family:Inter,Segoe UI,system-ui,-apple-system,sans-serif;overflow:hidden}
+    body:before, body:after{
+      content:"";position:fixed;inset:-20%;pointer-events:none;opacity:.35;filter:blur(40px)
+    }
+    body:before{background:radial-gradient(circle at 20% 20%, rgba(109,211,255,.28), transparent 30%), radial-gradient(circle at 80% 10%, rgba(147,255,182,.15), transparent 26%), radial-gradient(circle at 50% 90%, rgba(255,209,102,.15), transparent 30%);animation: drift 18s linear infinite alternate}
+    body:after{background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:50px 50px;mix-blend-mode:screen}
+    @keyframes drift{from{transform:translate3d(-2%,0,0) scale(1)}to{transform:translate3d(2%,-2%,0) scale(1.08)}}
+
+    .stage{position:relative;width:100vw;height:100vh;overflow:hidden}
+    .hud{position:absolute;top:18px;left:18px;right:18px;display:flex;justify-content:space-between;align-items:center;z-index:30}
+    .brand{display:flex;gap:14px;align-items:center;padding:12px 16px;background:rgba(8,18,33,.55);border:1px solid var(--line);backdrop-filter:blur(18px);border-radius:18px;box-shadow:var(--shadow)}
+    .brand-mark{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--accent),#497fff);display:grid;place-items:center;font-weight:800;color:#041220;letter-spacing:.02em}
+    .brand h1{font-size:16px;line-height:1.1;margin:0}
+    .brand p{margin:3px 0 0;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+    .controls{display:flex;gap:10px;align-items:center}
+    button{cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(9,21,38,.62);color:var(--text);padding:12px 16px;border-radius:16px;font-weight:600;backdrop-filter:blur(12px);transition:.25s transform,.25s background,.25s border-color}
+    button:hover{transform:translateY(-1px);border-color:rgba(109,211,255,.45);background:rgba(13,31,55,.84)}
+    button.primary{background:linear-gradient(135deg,rgba(109,211,255,.18),rgba(94,127,255,.18));border-color:rgba(109,211,255,.4)}
+
+    .timeline{position:absolute;left:24px;right:24px;bottom:18px;height:58px;display:flex;align-items:flex-end;z-index:32}
+    .timeline-shell{width:100%;padding:12px 14px;background:rgba(8,18,33,.55);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+    .timeline-track{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;position:relative}
+    .timeline-fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--accent),#8aa7ff,var(--accent-2));box-shadow:0 0 30px rgba(109,211,255,.45)}
+    .timeline-labels{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+    .scene{position:absolute;inset:0;padding:92px 34px 94px;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;opacity:0;transform:scale(1.04);transition:opacity 1s ease, transform 1s ease}
+    .scene.active{opacity:1;transform:scale(1)}
+    .scene:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,11,20,.18),rgba(5,11,20,.55))}
+
+    .left,.right{position:relative;z-index:2;min-height:0}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);backdrop-filter:blur(18px);box-shadow:var(--shadow)}
+    .hero{padding:34px;min-height:100%;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;position:relative}
+    .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.2em;color:var(--accent-2);margin-bottom:12px}
+    .title{font-size:clamp(38px,5vw,66px);line-height:.94;font-weight:800;letter-spacing:-.04em;margin:0 0 14px;max-width:760px}
+    .subtitle{font-size:19px;line-height:1.45;color:var(--muted);max-width:720px;margin:0}
+    .caption{position:absolute;left:34px;right:34px;bottom:30px;padding:18px 22px;background:rgba(3,8,16,.5);border:1px solid rgba(255,255,255,.08);border-radius:18px;font-size:18px;line-height:1.5;color:#f2f7ff}
+
+    .metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px}
+    .metric{padding:18px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:20px}
+    .metric .k{font-size:34px;font-weight:800;letter-spacing:-.04em}
+    .metric .l{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-top:6px}
+    .metric .s{margin-top:10px;font-size:12px;color:#c8d5e9;line-height:1.4}
+
+    .visual{position:relative;height:100%;padding:24px;overflow:hidden}
+    .grid-bg{position:absolute;inset:0;background:radial-gradient(circle at 20% 20%,rgba(109,211,255,.08),transparent 20%),linear-gradient(180deg,transparent,rgba(255,255,255,.02));}
+    .mini-tag{position:absolute;top:22px;right:22px;padding:10px 12px;border-radius:999px;background:rgba(7,16,29,.65);border:1px solid rgba(255,255,255,.09);font-size:11px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+
+    .map-wrap{position:absolute;inset:28px 24px 28px 24px;border-radius:22px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .india-outline{position:absolute;right:4%;top:10%;width:42%;opacity:.25;filter:drop-shadow(0 0 20px rgba(109,211,255,.3))}
+    .network{position:absolute;inset:0}
+    .warehouse,.customer-node{position:absolute;width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 7px rgba(109,211,255,.13), 0 0 18px rgba(109,211,255,.55)}
+    .customer-node{background:var(--accent-2);box-shadow:0 0 0 7px rgba(147,255,182,.11),0 0 16px rgba(147,255,182,.45)}
+    .label{position:absolute;font-size:12px;color:#dfeaff;transform:translate(18px,-2px);white-space:nowrap}
+    .route{position:absolute;height:2px;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(109,211,255,.9),rgba(255,255,255,.08));transform-origin:left center;opacity:.9}
+    .truck{position:absolute;width:14px;height:14px;background:linear-gradient(135deg,var(--accent-3),#ff9f43);border-radius:4px;box-shadow:0 0 12px rgba(255,209,102,.7)}
+
+    .chart-card{position:absolute;left:24px;right:24px;bottom:24px;height:42%;padding:18px}
+    .chart-title{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px}
+    .chart-title h3{margin:0;font-size:16px}
+    .chart-title span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
+    canvas{width:100%;height:100%}
+
+    .stack{display:grid;grid-template-rows:repeat(2,1fr);gap:18px;height:100%}
+    .flow-box,.ops-box,.ask-box{padding:24px;position:relative;overflow:hidden}
+    .flow-pill{display:inline-flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);border-radius:999px;margin:8px 10px 0 0;font-size:13px;color:#e7f1ff}
+    .flow-pill:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 12px rgba(147,255,182,.6)}
+    .ops-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+    .ops-card{padding:18px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08)}
+    .ops-card h4{margin:0 0 8px;font-size:16px}
+    .ops-card p{margin:0;color:var(--muted);line-height:1.45;font-size:13px}
+    .ask-box .big-ask{font-size:48px;font-weight:800;letter-spacing:-.04em;margin:10px 0}
+    .ask-list{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:18px}
+    .ask-item{padding:16px;border-radius:18px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04)}
+    .ask-item b{display:block;font-size:14px;margin-bottom:6px}
+    .ask-item span{font-size:13px;color:var(--muted);line-height:1.45}
+
+    .pulse{animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{50%{transform:scale(1.08)}}
+    .float{animation:float 5s ease-in-out infinite}
+    @keyframes float{50%{transform:translateY(-8px)}}
+    .scan{position:absolute;inset:0;background:linear-gradient(180deg,transparent,rgba(109,211,255,.06),transparent);animation:scan 4s linear infinite;pointer-events:none}
+    @keyframes scan{from{transform:translateY(-100%)}to{transform:translateY(100%)}}
+    .glow-line{position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(109,211,255,.6),transparent)}
+
+    @media (max-width: 1100px){
+      .scene{grid-template-columns:1fr;grid-template-rows:auto 1fr;overflow:auto}
+      .caption{position:static;margin-top:24px}
+      .metrics-grid,.ops-grid,.ask-list{grid-template-columns:1fr}
+      .timeline{bottom:8px}
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="hud">
+      <div class="brand">
+        <div class="brand-mark">A×N</div>
+        <div>
+          <h1>AIonOS × NX Group India</h1>
+          <p>Motion narrative for GCC / CEO discussion</p>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="playBtn" class="primary">Play</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="restartBtn">Restart</button>
+      </div>
+    </div>
+
+    <!-- Scene 1 -->
+    <section class="scene active" data-duration="28">
+      <div class="left">
+        <div class="panel hero">
+          <div class="glow-line"></div>
+          <div class="eyebrow">India growth moment</div>
+          <h2 class="title">From logistics scale to <span style="color:var(--accent)">intelligent scale</span></h2>
+          <p class="subtitle">NX is targeting major India growth. The real question is whether that growth is managed by more people reacting to complexity, or by AI getting ahead of it.</p>
+          <div class="metrics-grid">
+            <div class="metric float">
+              <div class="k">$400M</div>
+              <div class="l">India ambition by 2028</div>
+              <div class="s">Scale requires precision in warehousing, network control, and customer promise management.</div>
+            </div>
+            <div class="metric float" style="animation-delay:.5s">
+              <div class="k">103</div>
+              <div class="l">Locations in India</div>
+              <div class="s">A growing operating footprint magnifies every manual exception and coordination gap.</div>
+            </div>
+            <div class="metric float" style="animation-delay:1s">
+              <div class="k">60</div>
+              <div class="l">Warehouses</div>
+              <div class="s">Warehouse automation and control become essential as volume and service complexity rise.</div>
+            </div>
+          </div>
+          <div class="caption" data-caption="NX is entering a defining phase in India. Growth will not be won by adding capacity alone. It will be won by making every shipment, warehouse task, and customer promise more intelligent, more predictable, and more profitable."></div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="panel visual">
+          <div class="grid-bg"></div>
+          <div class="mini-tag">Footprint + growth narrative</div>
+          <div class="map-wrap">
+            <svg class="india-outline" viewBox="0 0 200 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M77 9l18 7 18 5 14 13 8 18 13 11 6 15-2 23 13 15-10 11 8 16-8 7-11-5-9 5-3 14-15 13-15 29-14 4-6-8 2-14-10-8-10-26-7-5-16 5-6-10 7-12-8-8 7-9-3-10-16-12-5-18 15-21 18-10 10-17z" stroke="rgba(109,211,255,.9)" stroke-width="2"/>
+            </svg>
+            <div class="network" id="network"></div>
+            <div class="chart-card panel">
+              <div class="chart-title"><h3>India scale pressure</h3><span>complexity index</span></div>
+              <canvas id="chart1"></canvas>
+              <div class="scan"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scene 2 -->
+    <section class="scene" data-duration="30">
+      <div class="left">
+        <div class="panel hero">
+          <div class="eyebrow">Focus on customer’s customer</div>
+          <h2 class="title">Your customers do not buy transport. <span style="color:var(--accent-2)">They buy certainty.</span></h2>
+          <p class="subtitle">Manufacturers buy continuity. Retailers buy shelf availability. Semiconductor clients buy flawless movement of high-value cargo. Their end customer only feels whether the promise held.</p>
+          <div style="margin-top:20px">
+            <span class="flow-pill">Production line does not stop</span>
+            <span class="flow-pill">Shelf stays filled</span>
+            <span class="flow-pill">Critical cargo arrives intact</span>
+            <span class="flow-pill">End customer feels confidence</span>
+          </div>
+          <div class="caption" data-caption="This is not a story about software. It is a story about certainty. When NX improves precision in logistics, the manufacturer avoids downtime, the retailer avoids stock-outs, and the end customer simply experiences reliability."></div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="stack">
+          <div class="panel flow-box">
+            <div class="mini-tag" style="left:auto;right:24px">Customer impact chain</div>
+            <svg viewBox="0 0 900 310" width="100%" height="100%">
+              <defs>
+                <linearGradient id="gradBlue" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#6dd3ff"/>
+                  <stop offset="100%" stop-color="#8b8cff"/>
+                </linearGradient>
+                <linearGradient id="gradGreen" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#93ffb6"/>
+                  <stop offset="100%" stop-color="#45d39b"/>
+                </linearGradient>
+              </defs>
+              <g transform="translate(40,55)">
+                <rect x="0" y="40" width="180" height="110" rx="24" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)"/>
+                <rect x="250" y="40" width="180" height="110" rx="24" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)"/>
+                <rect x="500" y="40" width="180" height="110" rx="24" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)"/>
+                <rect x="750" y="40" width="100" height="110" rx="24" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)"/>
+                <text x="90" y="95" text-anchor="middle" fill="#eaf2ff" font-size="24" font-weight="700">NX Ops</text>
+                <text x="340" y="95" text-anchor="middle" fill="#eaf2ff" font-size="24" font-weight="700">Client SLA</text>
+                <text x="590" y="95" text-anchor="middle" fill="#eaf2ff" font-size="24" font-weight="700">Store / Line</text>
+                <text x="800" y="95" text-anchor="middle" fill="#eaf2ff" font-size="22" font-weight="700">End User</text>
+                <path d="M180 95 C 220 95, 210 95, 250 95" stroke="url(#gradBlue)" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M430 95 C 470 95, 460 95, 500 95" stroke="url(#gradBlue)" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M680 95 C 720 95, 710 95, 750 95" stroke="url(#gradGreen)" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <circle cx="220" cy="95" r="10" fill="#6dd3ff"><animate attributeName="cx" values="180;250" dur="2.5s" repeatCount="indefinite"/></circle>
+                <circle cx="470" cy="95" r="10" fill="#6dd3ff"><animate attributeName="cx" values="430;500" dur="2.2s" repeatCount="indefinite"/></circle>
+                <circle cx="720" cy="95" r="10" fill="#93ffb6"><animate attributeName="cx" values="680;750" dur="2s" repeatCount="indefinite"/></circle>
+                <text x="5" y="215" fill="#9db1cc" font-size="18">The emotional outcome of great logistics is confidence.</text>
+              </g>
+            </svg>
+          </div>
+          <div class="panel flow-box">
+            <div class="mini-tag" style="left:auto;right:24px">Service confidence curve</div>
+            <canvas id="chart2"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scene 3 -->
+    <section class="scene" data-duration="34">
+      <div class="left">
+        <div class="panel hero">
+          <div class="eyebrow">Three pressure points</div>
+          <h2 class="title">Where scale starts to fracture</h2>
+          <p class="subtitle">As the network grows, manual coordination hits its limits. Congestion, fragmented visibility, and last-mile variability begin to erode service, margin, and trust.</p>
+          <div class="ops-grid">
+            <div class="ops-card"><h4>Warehouse orchestration</h4><p>Inbound surges, dock congestion, slotting inefficiency, labor volatility, and exception-heavy workflows.</p></div>
+            <div class="ops-card"><h4>Visibility without action</h4><p>Control towers see data but often do not predict failure or trigger the right next step early enough.</p></div>
+            <div class="ops-card"><h4>Last-mile variability</h4><p>Tighter SLAs, route risk, customer anxiety, and manual firefighting across distribution networks.</p></div>
+          </div>
+          <div class="caption" data-caption="Growth creates three simultaneous pressure points: warehouse orchestration becomes harder, visibility remains descriptive instead of prescriptive, and last-mile operations become more volatile. This is where margin and trust begin to leak."></div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="panel visual">
+          <div class="mini-tag">Operational fault lines</div>
+          <canvas id="chart3"></canvas>
+          <div class="scan"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scene 4 -->
+    <section class="scene" data-duration="36">
+      <div class="left">
+        <div class="panel hero">
+          <div class="eyebrow">AIonOS outcome engine</div>
+          <h2 class="title">From visibility to <span style="color:var(--accent)">decision automation</span></h2>
+          <p class="subtitle">AIonOS is not another dashboard layer. It is an operating system for intelligent action: predicting risk, prioritizing decisions, and reducing manual intervention across logistics operations.</p>
+          <div class="metrics-grid">
+            <div class="metric"><div class="k">30%</div><div class="l">Lower order latency</div><div class="s">Public AIonOS logistics case reference in processing optimization.</div></div>
+            <div class="metric"><div class="k">65%</div><div class="l">Lower turnaround time</div><div class="s">Illustrative AIonOS operating model impact in workflow transformation.</div></div>
+            <div class="metric"><div class="k">28%</div><div class="l">Higher CSAT</div><div class="s">Customer experience uplift from redesigned AI-enabled execution flows.</div></div>
+          </div>
+          <div class="caption" data-caption="For NX, AIonOS would focus on three outcomes: smarter warehouse execution, decision-grade visibility, and sharper last-mile control. The value is not more reporting. The value is faster, earlier, better action."></div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="panel visual">
+          <div class="mini-tag">AI control fabric</div>
+          <svg viewBox="0 0 900 620" width="100%" height="100%">
+            <defs>
+              <linearGradient id="flowA" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6dd3ff"/><stop offset="100%" stop-color="#7f8cff"/></linearGradient>
+              <linearGradient id="flowB" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#93ffb6"/><stop offset="100%" stop-color="#45d39b"/></linearGradient>
+              <filter id="softGlow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <g transform="translate(70,30)">
+              <rect x="280" y="200" width="260" height="170" rx="30" fill="rgba(255,255,255,.05)" stroke="rgba(109,211,255,.3)"/>
+              <text x="410" y="250" text-anchor="middle" fill="#eaf2ff" font-size="30" font-weight="800">AIonOS</text>
+              <text x="410" y="285" text-anchor="middle" fill="#9db1cc" font-size="18">Prediction • Prioritization • Automation</text>
+
+              <rect x="20" y="50" width="220" height="110" rx="24" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)"/>
+              <text x="130" y="105" text-anchor="middle" fill="#eaf2ff" font-size="24" font-weight="700">Warehouse</text>
+              <text x="130" y="132" text-anchor="middle" fill="#9db1cc" font-size="16">Dock • Labor • Picking</text>
+
+              <rect x="570" y="50" width="220" height="110" rx="24" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)"/>
+              <text x="680" y="105" text-anchor="middle" fill="#eaf2ff" font-size="24" font-weight="700">Control Tower</text>
+              <text x="680" y="132" text-anchor="middle" fill="#9db1cc" font-size="16">Risk • ETA • Exceptions</text>
+
+              <rect x="20" y="420" width="220" height="110" rx="24" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)"/>
+              <text x="130" y="475" text-anchor="middle" fill="#eaf2ff" font-size="24" font-weight="700">Last Mile</text>
+              <text x="130" y="502" text-anchor="middle" fill="#9db1cc" font-size="16">Routes • SLA • Communication</text>
+
+              <rect x="570" y="420" width="220" height="110" rx="24" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)"/>
+              <text x="680" y="475" text-anchor="middle" fill="#eaf2ff" font-size="24" font-weight="700">Customer Promise</text>
+              <text x="680" y="502" text-anchor="middle" fill="#9db1cc" font-size="16">OTIF • Experience • Trust</text>
+
+              <path d="M240 105 C310 105,300 220,280 250" stroke="url(#flowA)" stroke-width="6" fill="none" filter="url(#softGlow)"/>
+              <path d="M570 105 C520 105,530 220,540 250" stroke="url(#flowA)" stroke-width="6" fill="none" filter="url(#softGlow)"/>
+              <path d="M240 475 C310 475,300 350,280 320" stroke="url(#flowB)" stroke-width="6" fill="none" filter="url(#softGlow)"/>
+              <path d="M570 475 C520 475,530 350,540 320" stroke="url(#flowB)" stroke-width="6" fill="none" filter="url(#softGlow)"/>
+              <circle cx="240" cy="105" r="8" fill="#6dd3ff"><animateMotion dur="3s" repeatCount="indefinite" path="M0 0 C70 0,60 115,40 145"/></circle>
+              <circle cx="570" cy="105" r="8" fill="#6dd3ff"><animateMotion dur="2.6s" repeatCount="indefinite" path="M0 0 C-50 0,-40 115,-30 145"/></circle>
+              <circle cx="240" cy="475" r="8" fill="#93ffb6"><animateMotion dur="2.8s" repeatCount="indefinite" path="M0 0 C70 0,60 -125,40 -155"/></circle>
+              <circle cx="570" cy="475" r="8" fill="#93ffb6"><animateMotion dur="2.5s" repeatCount="indefinite" path="M0 0 C-50 0,-40 -125,-30 -155"/></circle>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scene 5 -->
+    <section class="scene" data-duration="28">
+      <div class="left">
+        <div class="panel hero">
+          <div class="eyebrow">Pilot proposal</div>
+          <h2 class="title">A 10-week pilot. <span style="color:var(--accent-3)">One baseline. One start date.</span></h2>
+          <p class="subtitle">Begin with one warehouse network and one visibility or last-mile use case. Measure latency reduction, intervention speed, and service improvement against a shared operating baseline.</p>
+          <div class="ask-list">
+            <div class="ask-item"><b>Scope</b><span>One India warehouse cluster plus one visibility or last-mile process with live exception flows.</span></div>
+            <div class="ask-item"><b>Target</b><span>Reduce planning and exception-handling latency by 20–30% with measurable operational uplift.</span></div>
+            <div class="ask-item"><b>Stakeholders</b><span>GCC, operations, warehouse leaders, customer service, and control-tower owners.</span></div>
+            <div class="ask-item"><b>Decision</b><span>Use the first two weeks to define baseline, intervention logic, and scale-up economics.</span></div>
+          </div>
+          <div class="caption" data-caption="The ask is simple. In the next two weeks, align on one pilot scope, one baseline, and one start date. This is not about exploring AI in the abstract. It is about proving where intelligent operations move the business fastest."></div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="stack">
+          <div class="panel ask-box">
+            <div class="mini-tag" style="left:auto;right:24px">Executive close</div>
+            <div class="big-ask">Meet in 2 weeks</div>
+            <div style="font-size:20px;color:#dce9fb;line-height:1.5">Leave the room with one pilot, one KPI baseline, and one go-live date.</div>
+          </div>
+          <div class="panel flow-box">
+            <div class="mini-tag" style="left:auto;right:24px">Pilot economics</div>
+            <canvas id="chart4"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="timeline">
+      <div class="timeline-shell">
+        <div class="timeline-track"><div class="timeline-fill" id="timelineFill"></div></div>
+        <div class="timeline-labels"><span>Opening</span><span>Customer story</span><span>Pressure points</span><span>AIonOS outcomes</span><span>Clear ask</span></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const scenes = [...document.querySelectorAll('.scene')];
+const timelineFill = document.getElementById('timelineFill');
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const restartBtn = document.getElementById('restartBtn');
+const network = document.getElementById('network');
+
+const totalDuration = scenes.reduce((sum,s)=>sum + Number(s.dataset.duration),0);
+let currentScene = 0;
+let elapsed = 0;
+let playing = false;
+let lastTs = 0;
+let sceneElapsed = 0;
+let utterance = null;
+
+const sceneNarration = scenes.map(scene => scene.querySelector('.caption').dataset.caption);
+
+function buildNetwork(){
+  const nodes = [
+    {x:18,y:21,label:'Delhi Hub',cls:'warehouse'},
+    {x:22,y:42,label:'Mumbai DC',cls:'warehouse'},
+    {x:42,y:34,label:'Nagpur',cls:'warehouse'},
+    {x:60,y:56,label:'Bengaluru',cls:'warehouse'},
+    {x:72,y:31,label:'Kolkata',cls:'warehouse'},
+    {x:80,y:50,label:'Chennai Port',cls:'customer-node'}
+  ];
+  const routes = [
+    [18,21,22,42],[18,21,42,34],[42,34,60,56],[42,34,72,31],[60,56,80,50],[22,42,60,56]
+  ];
+  nodes.forEach(n=>{
+    const d=document.createElement('div');
+    d.className=n.cls + ' pulse';
+    d.style.left=n.x+'%'; d.style.top=n.y+'%';
+    const l=document.createElement('div');
+    l.className='label'; l.textContent=n.label; l.style.left=n.x+'%'; l.style.top=n.y+'%';
+    network.appendChild(d); network.appendChild(l);
+  });
+  routes.forEach(([x1,y1,x2,y2],i)=>{
+    const dx=x2-x1, dy=y2-y1;
+    const len=Math.hypot(dx,dy);
+    const angle=Math.atan2(dy,dx)*180/Math.PI;
+    const r=document.createElement('div');
+    r.className='route'; r.style.left=x1+'%'; r.style.top=y1+'%'; r.style.width=len+'%'; r.style.transform=`rotate(${angle}deg)`;
+    r.style.animation=`pulse ${2+(i%3)}s ease-in-out infinite`;
+    network.appendChild(r);
+
+    const t=document.createElement('div');
+    t.className='truck';
+    network.appendChild(t);
+    animateTruck(t,x1,y1,x2,y2, 4500 + i*700);
+  });
+}
+
+function animateTruck(el,x1,y1,x2,y2,dur){
+  let start = performance.now() + Math.random()*2000;
+  function step(ts){
+    const p=((ts-start)%dur+dur)%dur/dur;
+    const x = x1 + (x2-x1)*p;
+    const y = y1 + (y2-y1)*p;
+    el.style.left = `calc(${x}% - 7px)`;
+    el.style.top = `calc(${y}% - 7px)`;
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function drawLineChart(canvasId, series, opts={}){
+  const c=document.getElementById(canvasId); if(!c) return;
+  const dpr=window.devicePixelRatio||1;
+  const rect=c.getBoundingClientRect();
+  c.width=rect.width*dpr; c.height=rect.height*dpr;
+  const ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
+  const w=rect.width,h=rect.height,p=32;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
+  for(let i=0;i<5;i++){
+    const y=p+i*(h-p*2)/4; ctx.beginPath(); ctx.moveTo(p,y); ctx.lineTo(w-p,y); ctx.stroke();
+  }
+  const max=Math.max(...series.flatMap(s=>s.data))*1.1;
+  series.forEach((s,idx)=>{
+    const grad=ctx.createLinearGradient(0,0,w,0);
+    grad.addColorStop(0,s.color1); grad.addColorStop(1,s.color2);
+    ctx.strokeStyle=grad; ctx.lineWidth=3; ctx.beginPath();
+    s.data.forEach((v,i)=>{
+      const x=p+i*(w-p*2)/(s.data.length-1);
+      const y=h-p-(v/max)*(h-p*2);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    s.data.forEach((v,i)=>{
+      const x=p+i*(w-p*2)/(s.data.length-1);
+      const y=h-p-(v/max)*(h-p*2);
+      ctx.fillStyle=s.color1; ctx.beginPath(); ctx.arc(x,y,4.2,0,Math.PI*2); ctx.fill();
+    });
+  });
+  if(opts.legend!==false){
+    series.forEach((s,i)=>{
+      const x=p+i*160; const y=18;
+      ctx.fillStyle=s.color1; ctx.fillRect(x,y,18,4);
+      ctx.fillStyle='rgba(234,242,255,.9)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(s.label,x+26,y+6);
+    });
+  }
+}
+
+function drawBarChart(canvasId, labels, values, colors){
+  const c=document.getElementById(canvasId); if(!c) return;
+  const dpr=window.devicePixelRatio||1;
+  const rect=c.getBoundingClientRect();
+  c.width=rect.width*dpr; c.height=rect.height*dpr;
+  const ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
+  const w=rect.width,h=rect.height,p=36;
+  ctx.clearRect(0,0,w,h);
+  const max=Math.max(...values)*1.15;
+  const barW=(w-p*2)/values.length*0.58;
+  values.forEach((v,i)=>{
+    const x=p + i*((w-p*2)/values.length)+((w-p*2)/values.length-barW)/2;
+    const bh=(v/max)*(h-p*2);
+    const y=h-p-bh;
+    const grad=ctx.createLinearGradient(x,y,x,y+bh);
+    grad.addColorStop(0,colors[i][0]); grad.addColorStop(1,colors[i][1]);
+    ctx.fillStyle=grad;
+    roundRect(ctx,x,y,barW,bh,16,true,false);
+    ctx.fillStyle='#dfeaff'; ctx.font='bold 16px Inter'; ctx.fillText(v+'%',x+barW/2-18,y-10);
+    ctx.fillStyle='#9db1cc'; ctx.font='12px Inter'; wrapText(ctx,labels[i],x-8,h-p+24,barW+16,15);
+  });
+}
+
+function drawRadar(canvasId){
+  const c=document.getElementById(canvasId); if(!c) return;
+  const dpr=window.devicePixelRatio||1;
+  const rect=c.getBoundingClientRect(); c.width=rect.width*dpr; c.height=rect.height*dpr;
+  const ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
+  const w=rect.width,h=rect.height; ctx.clearRect(0,0,w,h);
+  const cx=w/2, cy=h/2+10, r=Math.min(w,h)*0.28;
+  const labels=['Warehouse\nCongestion','Exception\nLatency','ETA\nVariance','Manual\nTouchpoints','SLA\nRisk','Customer\nAnxiety'];
+  const before=[80,78,70,74,76,72]; const after=[44,46,38,41,43,35];
+  for(let level=1; level<=5; level++){
+    ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.beginPath();
+    for(let i=0;i<6;i++){
+      const a=-Math.PI/2 + i*(Math.PI*2/6); const rr=r*level/5;
+      const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.closePath(); ctx.stroke();
+  }
+  labels.forEach((lab,i)=>{
+    const a=-Math.PI/2 + i*(Math.PI*2/6); const x=cx+Math.cos(a)*(r+24), y=cy+Math.sin(a)*(r+24);
+    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r); ctx.stroke();
+    ctx.fillStyle='#9db1cc'; ctx.font='12px Inter'; lab.split('\n').forEach((t,j)=>ctx.fillText(t,x-26,y+j*14));
+  });
+  [['rgba(255,107,122,.18)','#ff6b7a',before],['rgba(109,211,255,.18)','#6dd3ff',after]].forEach(([fill,stroke,data])=>{
+    ctx.beginPath();
+    data.forEach((v,i)=>{
+      const a=-Math.PI/2 + i*(Math.PI*2/6); const rr=r*(v/100); const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.closePath(); ctx.fillStyle=fill; ctx.strokeStyle=stroke; ctx.lineWidth=3; ctx.fill(); ctx.stroke();
+  });
+  ctx.fillStyle='#eaf2ff'; ctx.font='bold 14px Inter'; ctx.fillText('Before AI-led intervention',24,28); ctx.fillStyle='#ff6b7a'; ctx.fillRect(230,17,20,4);
+  ctx.fillStyle='#eaf2ff'; ctx.fillText('After AIonOS intervention',24,50); ctx.fillStyle='#6dd3ff'; ctx.fillRect(220,39,20,4);
+}
+
+function roundRect(ctx,x,y,w,h,r,fill,stroke){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); if(fill) ctx.fill(); if(stroke) ctx.stroke();
+}
+function wrapText(ctx,text,x,y,maxWidth,lineHeight){
+  const words=text.split(' '); let line=''; let yy=y;
+  words.forEach(word=>{ const test=line+word+' '; if(ctx.measureText(test).width>maxWidth && line){ctx.fillText(line,x,yy); line=word+' '; yy+=lineHeight;} else line=test;});
+  if(line) ctx.fillText(line,x,yy);
+}
+
+function resizeAllCharts(){
+  drawLineChart('chart1',[
+    {label:'Network volume',data:[42,48,53,61,69,76],color1:'#6dd3ff',color2:'#8b8cff'},
+    {label:'Operational complexity',data:[36,44,52,66,78,92],color1:'#93ffb6',color2:'#49d7a5'}
+  ]);
+  drawLineChart('chart2',[
+    {label:'OTIF confidence',data:[62,66,71,77,84,91],color1:'#93ffb6',color2:'#45d39b'},
+    {label:'Customer anxiety',data:[74,68,61,53,45,37],color1:'#ffd166',color2:'#ff8f5a'}
+  ]);
+  drawRadar('chart3');
+  drawBarChart('chart4', ['Planning latency reduction','Exception handling improvement','Faster risk intervention','Service reliability uplift'], [20,30,24,18], [['#6dd3ff','#7b8cff'],['#93ffb6','#45d39b'],['#ffd166','#ff935c'],['#d0a7ff','#7f8cff']]);
+}
+
+function showScene(index){
+  scenes.forEach((s,i)=>s.classList.toggle('active', i===index));
+  sceneElapsed = 0;
+  const cap = scenes[index].querySelector('.caption');
+  typeCaption(cap, cap.dataset.caption);
+  speak(sceneNarration[index]);
+}
+
+function typeCaption(el, text){
+  el.textContent='';
+  let i=0;
+  const speed=22;
+  const timer=setInterval(()=>{
+    if(!scenes[currentScene].classList.contains('active')){clearInterval(timer); return;}
+    el.textContent=text.slice(0, i++);
+    if(i>text.length) clearInterval(timer);
+  }, speed);
+}
+
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.93;
+  utterance.pitch = 0.98;
+  utterance.volume = 1;
+  const voice = speechSynthesis.getVoices().find(v=>/Google US English|Microsoft David|Samantha|Aria/i.test(v.name)) || speechSynthesis.getVoices()[0];
+  if(voice) utterance.voice = voice;
+  speechSynthesis.speak(utterance);
+}
+
+function tick(ts){
+  if(!playing) return;
+  if(!lastTs) lastTs=ts;
+  const delta=(ts-lastTs)/1000; lastTs=ts;
+  elapsed+=delta; sceneElapsed+=delta;
+  const pct=Math.min(100,(elapsed/totalDuration)*100); timelineFill.style.width=pct+'%';
+  const dur=Number(scenes[currentScene].dataset.duration);
+  if(sceneElapsed>=dur){
+    currentScene++;
+    if(currentScene>=scenes.length){playing=false; currentScene=scenes.length-1; return;}
+    showScene(currentScene);
+  }
+  requestAnimationFrame(tick);
+}
+
+function play(){
+  if(playing) return; playing=true; lastTs=0; requestAnimationFrame(tick);
+}
+function pause(){ playing=false; window.speechSynthesis?.pause(); }
+function restart(){
+  playing=false; elapsed=0; currentScene=0; lastTs=0; timelineFill.style.width='0%';
+  window.speechSynthesis?.cancel(); showScene(0); play();
+}
+
+playBtn.onclick=()=>{window.speechSynthesis?.resume(); play();};
+pauseBtn.onclick=()=>pause();
+restartBtn.onclick=()=>restart();
+window.addEventListener('resize', resizeAllCharts);
+window.speechSynthesis?.onvoiceschanged?.();
+
+buildNetwork();
+resizeAllCharts();
+showScene(0);
+</script>
+</body>
+</html>
