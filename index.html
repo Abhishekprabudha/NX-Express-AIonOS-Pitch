@@ -109,15 +109,19 @@
     .india-map-container{position:absolute;inset:0}
     #indiaMap{position:absolute;inset:0}
     .truck-marker{
+      width:42px;height:20px;position:relative;
+    }
+    .truck-rotator{
       width:42px;height:20px;position:relative;display:flex;align-items:center;justify-content:center;
       background:#ffffff;border:1px solid rgba(0,29,67,.35);border-radius:5px 6px 4px 4px;
-      box-shadow:0 6px 16px rgba(3,19,42,.38)
+      box-shadow:0 6px 16px rgba(3,19,42,.38);
+      transform-origin:50% 50%
     }
-    .truck-marker:before{
+    .truck-rotator:before{
       content:"";position:absolute;right:-11px;top:4px;width:13px;height:12px;background:#f3f8ff;
       border:1px solid rgba(0,29,67,.35);border-left:none;border-radius:0 5px 5px 0
     }
-    .truck-marker:after{
+    .truck-rotator:after{
       content:"";position:absolute;left:5px;right:5px;bottom:4px;height:3px;
       background:linear-gradient(90deg,#ffffff 0 33%, #1f6fff 33% 66%, #78d83f 66% 100%);
       border-radius:999px
@@ -465,6 +469,29 @@ function interpolateLngLat(start, end, t){
   return [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t];
 }
 
+function clamp(v, min, max){
+  return Math.max(min, Math.min(max, v));
+}
+
+function progressOnRoute(route, t){
+  const tt = clamp(t, 0, 1);
+  if(route.length <= 1) return route[0];
+  const segCount = route.length - 1;
+  const scaled = tt * segCount;
+  const seg = Math.min(segCount - 1, Math.floor(scaled));
+  const localT = scaled - seg;
+  return interpolateLngLat(route[seg], route[seg + 1], localT);
+}
+
+function computeScreenBearingDegrees(route, t){
+  if(!map) return 0;
+  const back = progressOnRoute(route, clamp(t - 0.01, 0, 1));
+  const fwd = progressOnRoute(route, clamp(t + 0.01, 0, 1));
+  const p1 = map.project(back);
+  const p2 = map.project(fwd);
+  return (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
+}
+
 function initIndiaMap(){
   if(map || !window.maplibregl || !document.getElementById('indiaMap')) return;
   map = new maplibregl.Map({
@@ -601,6 +628,8 @@ function setupTruckAnimation(routeFeatures){
   routeFeatures.forEach((feature, i) => {
     const el = document.createElement('div');
     el.className = 'truck-marker';
+    const rotator = document.createElement('div');
+    rotator.className = 'truck-rotator';
     const logo = document.createElement('span');
     logo.className = 'truck-logo';
     logo.textContent = 'NX';
@@ -608,18 +637,22 @@ function setupTruckAnimation(routeFeatures){
     wheelLeft.className = 'truck-wheel left';
     const wheelRight = document.createElement('span');
     wheelRight.className = 'truck-wheel right';
-    el.append(logo, wheelLeft, wheelRight);
+    rotator.append(logo, wheelLeft, wheelRight);
+    el.append(rotator);
     const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(feature.geometry.coordinates[0]).addTo(map);
-    truckMarkers.push({ marker, route: feature.geometry.coordinates, duration: 4200 + (i * 650), delay: i * 320 });
+    truckMarkers.push({ marker, rotator, route: feature.geometry.coordinates, duration: 4200 + (i * 650), delay: i * 320 });
   });
 
   const t0 = performance.now();
   const animate = (ts) => {
     truckMarkers.forEach((tm) => {
-      const local = (((ts - t0 - tm.delay) % tm.duration) + tm.duration) / tm.duration;
-      const p = local > 1 ? local - 1 : local;
-      const lngLat = interpolateLngLat(tm.route[0], tm.route[1], p);
+      const elapsed = ts - t0 - tm.delay;
+      const cycle = ((elapsed % (tm.duration * 2)) + (tm.duration * 2)) / tm.duration;
+      const p = cycle <= 1 ? cycle : 2 - cycle;
+      const lngLat = progressOnRoute(tm.route, p);
       tm.marker.setLngLat(lngLat);
+      const bearing = computeScreenBearingDegrees(tm.route, p);
+      tm.rotator.style.transform = `rotate(${bearing}deg)`;
     });
     routeAnimationRaf = requestAnimationFrame(animate);
   };
