@@ -109,45 +109,8 @@
     .india-map-container{position:absolute;inset:0}
     #indiaMap{position:absolute;inset:0}
     .truck-marker{
-      width:26px;
-      height:20px;
-      border-radius:4px;
-      background:
-        linear-gradient(180deg,#ffffff 0 54%, #f2f6fb 54% 100%);
-      border:1px solid rgba(9,22,38,.28);
-      box-shadow:0 0 0 1px rgba(255,255,255,.45) inset,0 6px 14px rgba(4,18,34,.35),0 0 12px rgba(49,122,232,.25);
-      position:relative;
-      overflow:hidden;
-      transform:translateZ(0);
-    }
-    .truck-marker:before{
-      content:"";
-      position:absolute;
-      left:0;top:0;bottom:0;
-      width:5px;
-      background:#d1222a;
-      box-shadow:6px 0 0 #0d3f93;
-      opacity:.95;
-    }
-    .truck-marker:after{
-      content:"";
-      position:absolute;
-      left:0;right:0;bottom:0;
-      height:2px;
-      background:rgba(13,63,147,.32);
-    }
-    .truck-marker .nx-logo{
-      position:absolute;
-      right:3px;
-      top:3px;
-      font-size:8px;
-      letter-spacing:.04em;
-      font-weight:800;
-      font-family:Inter,Segoe UI,system-ui,-apple-system,sans-serif;
-      color:#0d3f93;
-      text-shadow:0 1px 0 rgba(255,255,255,.8);
-      user-select:none;
-      line-height:1;
+      width:18px;height:18px;border-radius:4px;background:linear-gradient(135deg,var(--accent-3),#ff9f43);
+      box-shadow:0 0 14px rgba(255,209,102,.82);border:1px solid rgba(0,0,0,.25)
     }
     .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{display:none}
     @keyframes earthRotate{from{transform:translateX(-8%)}to{transform:translateX(8%)}}
@@ -586,7 +549,6 @@ function setupTruckAnimation(routeFeatures){
   routeFeatures.forEach((feature, i) => {
     const el = document.createElement('div');
     el.className = 'truck-marker';
-    el.innerHTML = '<span class="nx-logo">NX</span>';
     const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(feature.geometry.coordinates[0]).addTo(map);
     truckMarkers.push({ marker, route: feature.geometry.coordinates, duration: 4200 + (i * 650), delay: i * 320 });
   });
