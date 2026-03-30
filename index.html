@@ -455,7 +455,7 @@ const truckMarkers = [];
 
 const BASE_WORDS_PER_SEC = 2.85;
 const VOICE_PITCH_MULTIPLIER = 1.4;
-const VOICE_RATE_MULTIPLIER = 1.4;
+const VOICE_RATE_MULTIPLIER = 0.98; // 30% slower than previous 1.4 baseline
 const sceneNarration = scenes.map(scene => scene.querySelector('.caption').dataset.caption);
 const estimatedSceneDurations = sceneNarration.map(text => Math.max(7, text.trim().split(/\s+/).length / BASE_WORDS_PER_SEC));
 const totalDuration = estimatedSceneDurations.reduce((sum,d)=>sum + d,0) + 3.4;
