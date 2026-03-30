@@ -647,7 +647,9 @@ function setupTruckAnimation(routeFeatures){
   const animate = (ts) => {
     truckMarkers.forEach((tm) => {
       const elapsed = ts - t0 - tm.delay;
-      const cycle = ((elapsed % (tm.duration * 2)) + (tm.duration * 2)) / tm.duration;
+      const loopDuration = tm.duration * 2;
+      const loopElapsed = ((elapsed % loopDuration) + loopDuration) % loopDuration;
+      const cycle = loopElapsed / tm.duration;
       const p = cycle <= 1 ? cycle : 2 - cycle;
       const lngLat = progressOnRoute(tm.route, p);
       tm.marker.setLngLat(lngLat);
