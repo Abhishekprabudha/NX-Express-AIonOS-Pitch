@@ -109,10 +109,11 @@
     .india-map-container{position:absolute;inset:0}
     #indiaMap{position:absolute;inset:0}
     .truck-marker{
-      width:21px;height:10px;position:relative;
+      width:21px;height:10px;position:relative;overflow:visible;
     }
     .truck-rotator{
       width:21px;height:10px;position:relative;display:flex;align-items:center;justify-content:center;
+      transform:translate(-2px,-1px);
       background:#ffffff;border:1px solid rgba(0,29,67,.35);border-radius:3px 3px 2px 2px;
       box-shadow:0 6px 16px rgba(3,19,42,.38);
       transform-origin:50% 50%
@@ -497,24 +498,17 @@ function offsetLngLatByScreenPixels(route, t, laneOffsetPx){
     return progressOnRoute(route, t);
   }
   const base = progressOnRoute(route, t);
+  const back = progressOnRoute(route, clamp(t - 0.01, 0, 1));
   const ahead = progressOnRoute(route, clamp(t + 0.01, 0, 1));
   const pBase = map.project(base);
+  const pBack = map.project(back);
   const pAhead = map.project(ahead);
-  const dx = pAhead.x - pBase.x;
-  const dy = pAhead.y - pBase.y;
+  const dx = pAhead.x - pBack.x;
+  const dy = pAhead.y - pBack.y;
   const len = Math.hypot(dx, dy) || 1;
   const nx = -dy / len;
   const ny = dx / len;
   return map.unproject([pBase.x + nx * laneOffsetPx, pBase.y + ny * laneOffsetPx]).toArray();
-}
-
-function snapTruckToLane(tm, targetLngLat){
-  const targetPixel = map.project(targetLngLat);
-  const markerPixel = map.project(tm.marker.getLngLat());
-  const drift = Math.hypot(targetPixel.x - markerPixel.x, targetPixel.y - markerPixel.y);
-  if(drift > 0.75){
-    tm.marker.setLngLat(targetLngLat);
-  }
 }
 
 function initIndiaMap(){
@@ -691,7 +685,7 @@ function setupTruckAnimation(routeFeatures){
       const cycle = loopElapsed / tm.duration;
       const p = cycle <= 1 ? cycle : 2 - cycle;
       const laneLngLat = offsetLngLatByScreenPixels(tm.route, p, tm.laneOffset);
-      snapTruckToLane(tm, laneLngLat);
+      tm.marker.setLngLat(laneLngLat);
       const bearing = computeScreenBearingDegrees(tm.route, p);
       tm.rotator.style.transform = `rotate(${bearing}deg)`;
     });
