@@ -1,1 +1,36 @@
 # NX-Express-AIonOS-Pitch
+
+## Truck animation troubleshooting (lane movement)
+
+If trucks are rendered but appear frozen on lanes, the most common root causes are:
+
+1. **The JS bundle is duplicated in the same file**
+   - If the same `let`/`const` declarations (for example `let __DBG`, `const map`, `const trucks`) appear twice in one script, the browser throws a parse-time error such as:
+     - `Identifier 'map' has already been declared`
+   - In that case, **none of the animation code runs** (including `requestAnimationFrame(tick)`), so trucks never move.
+
+2. **`requestAnimationFrame` loop not started**
+   - The movement loop must run continuously (`tick()`/`drawFrame()`) and update each truck's route progress (`t`).
+
+3. **Runtime error inside truck draw path**
+   - A render-time exception inside the loop can halt animation updates.
+
+### Reference behavior used in the map animation
+
+A working setup typically does all of the following:
+
+- Creates truck state (`latlon`, `seg`, `t`, `dir`, `speed`, `startAt`).
+- In each frame:
+  - Computes elapsed delta time (`dt`).
+  - Advances `t` by a step based on speed and segment length.
+  - Rolls to next segment when `t >= 1`.
+  - Draws truck at interpolated position with lane offset.
+- Schedules the next frame with `requestAnimationFrame(...)`.
+
+### Quick checks
+
+Open browser DevTools Console and verify there are no parse errors and no repeated declarations.
+
+- ✅ Good: no `Identifier ... has already been declared` error.
+- ✅ Good: animation loop function is running every frame.
+- ✅ Good: truck list contains spawned trucks after scenario load.
