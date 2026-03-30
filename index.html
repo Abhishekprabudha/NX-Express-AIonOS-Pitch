@@ -109,31 +109,31 @@
     .india-map-container{position:absolute;inset:0}
     #indiaMap{position:absolute;inset:0}
     .truck-marker{
-      width:42px;height:20px;position:relative;
+      width:21px;height:10px;position:relative;
     }
     .truck-rotator{
-      width:42px;height:20px;position:relative;display:flex;align-items:center;justify-content:center;
-      background:#ffffff;border:1px solid rgba(0,29,67,.35);border-radius:5px 6px 4px 4px;
+      width:21px;height:10px;position:relative;display:flex;align-items:center;justify-content:center;
+      background:#ffffff;border:1px solid rgba(0,29,67,.35);border-radius:3px 3px 2px 2px;
       box-shadow:0 6px 16px rgba(3,19,42,.38);
       transform-origin:50% 50%
     }
     .truck-rotator:before{
-      content:"";position:absolute;right:-11px;top:4px;width:13px;height:12px;background:#f3f8ff;
-      border:1px solid rgba(0,29,67,.35);border-left:none;border-radius:0 5px 5px 0
+      content:"";position:absolute;right:-6px;top:2px;width:7px;height:6px;background:#f3f8ff;
+      border:1px solid rgba(0,29,67,.35);border-left:none;border-radius:0 3px 3px 0
     }
     .truck-rotator:after{
-      content:"";position:absolute;left:5px;right:5px;bottom:4px;height:3px;
+      content:"";position:absolute;left:3px;right:3px;bottom:2px;height:2px;
       background:linear-gradient(90deg,#ffffff 0 33%, #1f6fff 33% 66%, #78d83f 66% 100%);
       border-radius:999px
     }
     .truck-logo{
-      font-size:8px;font-weight:800;letter-spacing:.06em;color:#1750ad;text-shadow:0 0 2px rgba(255,255,255,.85)
+      font-size:5px;font-weight:800;letter-spacing:.05em;color:#1750ad;text-shadow:0 0 2px rgba(255,255,255,.85)
     }
     .truck-wheel{
-      position:absolute;bottom:-4px;width:7px;height:7px;border-radius:50%;background:#0c1f38;border:1px solid #d2dfef
+      position:absolute;bottom:-2px;width:4px;height:4px;border-radius:50%;background:#0c1f38;border:1px solid #d2dfef
     }
-    .truck-wheel.left{left:8px}
-    .truck-wheel.right{right:6px}
+    .truck-wheel.left{left:4px}
+    .truck-wheel.right{right:3px}
     .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{display:none}
     @keyframes earthRotate{from{transform:translateX(-8%)}to{transform:translateX(8%)}}
     @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
@@ -492,6 +492,31 @@ function computeScreenBearingDegrees(route, t){
   return (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
 }
 
+function offsetLngLatByScreenPixels(route, t, laneOffsetPx){
+  if(!map || !Number.isFinite(laneOffsetPx) || Math.abs(laneOffsetPx) < 0.01){
+    return progressOnRoute(route, t);
+  }
+  const base = progressOnRoute(route, t);
+  const ahead = progressOnRoute(route, clamp(t + 0.01, 0, 1));
+  const pBase = map.project(base);
+  const pAhead = map.project(ahead);
+  const dx = pAhead.x - pBase.x;
+  const dy = pAhead.y - pBase.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  return map.unproject([pBase.x + nx * laneOffsetPx, pBase.y + ny * laneOffsetPx]).toArray();
+}
+
+function snapTruckToLane(tm, targetLngLat){
+  const targetPixel = map.project(targetLngLat);
+  const markerPixel = map.project(tm.marker.getLngLat());
+  const drift = Math.hypot(targetPixel.x - markerPixel.x, targetPixel.y - markerPixel.y);
+  if(drift > 0.75){
+    tm.marker.setLngLat(targetLngLat);
+  }
+}
+
 function initIndiaMap(){
   if(map || !window.maplibregl || !document.getElementById('indiaMap')) return;
   map = new maplibregl.Map({
@@ -519,7 +544,9 @@ function initIndiaMap(){
     ['Mumbai', 'Nagpur'],
     ['Nagpur', 'Bengaluru'],
     ['Bengaluru', 'Chennai'],
-    ['Kolkata', 'Chennai']
+    ['Kolkata', 'Chennai'],
+    ['Mumbai', 'Delhi'],
+    ['Mumbai', 'Bengaluru']
   ];
   const byName = Object.fromEntries(cities.map(c => [c.name, c.coord]));
   const routeFeatures = routes.map(([from, to], idx) => ({
@@ -625,22 +652,34 @@ function initIndiaMap(){
 }
 
 function setupTruckAnimation(routeFeatures){
-  routeFeatures.forEach((feature, i) => {
-    const el = document.createElement('div');
-    el.className = 'truck-marker';
-    const rotator = document.createElement('div');
-    rotator.className = 'truck-rotator';
-    const logo = document.createElement('span');
-    logo.className = 'truck-logo';
-    logo.textContent = 'NX';
-    const wheelLeft = document.createElement('span');
-    wheelLeft.className = 'truck-wheel left';
-    const wheelRight = document.createElement('span');
-    wheelRight.className = 'truck-wheel right';
-    rotator.append(logo, wheelLeft, wheelRight);
-    el.append(rotator);
-    const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(feature.geometry.coordinates[0]).addTo(map);
-    truckMarkers.push({ marker, rotator, route: feature.geometry.coordinates, duration: 4200 + (i * 650), delay: i * 320 });
+  const laneOffsets = [-2.2, 0, 2.2];
+  routeFeatures.forEach((feature, routeIdx) => {
+    laneOffsets.forEach((laneOffset, laneIdx) => {
+      const i = (routeIdx * laneOffsets.length) + laneIdx;
+      const el = document.createElement('div');
+      el.className = 'truck-marker';
+      const rotator = document.createElement('div');
+      rotator.className = 'truck-rotator';
+      const logo = document.createElement('span');
+      logo.className = 'truck-logo';
+      logo.textContent = 'NX';
+      const wheelLeft = document.createElement('span');
+      wheelLeft.className = 'truck-wheel left';
+      const wheelRight = document.createElement('span');
+      wheelRight.className = 'truck-wheel right';
+      rotator.append(logo, wheelLeft, wheelRight);
+      el.append(rotator);
+      const startLngLat = offsetLngLatByScreenPixels(feature.geometry.coordinates, 0, laneOffset);
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(startLngLat).addTo(map);
+      truckMarkers.push({
+        marker,
+        rotator,
+        route: feature.geometry.coordinates,
+        laneOffset,
+        duration: 4200 + (i * 210),
+        delay: i * 120
+      });
+    });
   });
 
   const t0 = performance.now();
@@ -651,8 +690,8 @@ function setupTruckAnimation(routeFeatures){
       const loopElapsed = ((elapsed % loopDuration) + loopDuration) % loopDuration;
       const cycle = loopElapsed / tm.duration;
       const p = cycle <= 1 ? cycle : 2 - cycle;
-      const lngLat = progressOnRoute(tm.route, p);
-      tm.marker.setLngLat(lngLat);
+      const laneLngLat = offsetLngLatByScreenPixels(tm.route, p, tm.laneOffset);
+      snapTruckToLane(tm, laneLngLat);
       const bearing = computeScreenBearingDegrees(tm.route, p);
       tm.rotator.style.transform = `rotate(${bearing}deg)`;
     });
