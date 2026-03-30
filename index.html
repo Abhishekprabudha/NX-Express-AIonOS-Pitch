@@ -841,7 +841,14 @@ function typeCaption(el, text, sceneDurationSec = 10){
 
 function pickEnergeticMaleVoice(){
   const voices = speechSynthesis.getVoices();
-  return voices.find(v=>/David|Guy|Ryan|Brian|Tom|Alex|Google US English Male|Google UK English Male|Microsoft Mark|Microsoft David/i.test(v.name))
+  const britishMale = voices.find(v =>
+    /en-GB/i.test(v.lang || '') &&
+    /male|man|masculine|david|guy|ryan|brian|tom|alex|mark/i.test(v.name || '')
+  );
+  if(britishMale) return britishMale;
+
+  return voices.find(v=>/Google UK English Male|Microsoft Ryan|Microsoft George|Daniel|Thomas|Arthur|Oliver/i.test(v.name))
+    || voices.find(v=>/en-GB/i.test(v.lang || ''))
     || voices.find(v=>/male|man|masculine/i.test(v.name))
     || voices[0];
 }
@@ -852,6 +859,7 @@ function speakText(text, cfg = {}, onEnd){
     return null;
   }
   const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-GB';
   u.rate = Math.min(10, (cfg.rate ?? 1.06) * VOICE_RATE_MULTIPLIER);
   u.pitch = Math.min(2, (cfg.pitch ?? 1.2) * VOICE_PITCH_MULTIPLIER);
   u.volume = cfg.volume ?? 1;
