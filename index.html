@@ -47,6 +47,7 @@
     .left,.right{position:relative;z-index:2;min-height:0}
     .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);backdrop-filter:blur(18px);box-shadow:var(--shadow)}
     .hero{padding:34px;min-height:100%;display:flex;flex-direction:column;justify-content:flex-end;overflow-y:auto;position:relative}
+    .hero-video{width:100%;height:100%;object-fit:cover;border-radius:22px;display:block}
     .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.2em;color:var(--accent-2);margin-bottom:12px}
     .title{font-size:clamp(38px,5vw,66px);line-height:.94;font-weight:800;letter-spacing:-.04em;margin:0 0 14px;max-width:760px}
     .subtitle{font-size:19px;line-height:1.45;color:var(--muted);max-width:720px;margin:0}
@@ -209,28 +210,9 @@
     <section class="scene active" data-duration="28">
       <div class="left">
         <div class="panel hero">
-          <div class="glow-line"></div>
-          <div class="eyebrow">India growth moment</div>
-          <h2 class="title">From logistics scale to <span style="color:var(--accent)">intelligent scale</span></h2>
-          <p class="subtitle">NX is targeting major India growth. The real question is whether that growth is managed by more people reacting to complexity, or by AI getting ahead of it.</p>
-          <div class="metrics-grid">
-            <div class="metric float">
-              <div class="k">$400M</div>
-              <div class="l">India ambition by 2028</div>
-              <div class="s">Scale requires precision in warehousing, network control, and customer promise management.</div>
-            </div>
-            <div class="metric float" style="animation-delay:.5s">
-              <div class="k">103</div>
-              <div class="l">Locations in India</div>
-              <div class="s">A growing operating footprint magnifies every manual exception and coordination gap.</div>
-            </div>
-            <div class="metric float" style="animation-delay:1s">
-              <div class="k">60</div>
-              <div class="l">Warehouses</div>
-              <div class="s">Warehouse automation and control become essential as volume and service complexity rise.</div>
-            </div>
-          </div>
-          <div class="caption" data-caption="NX is entering a defining phase in India. Growth will not be won by adding capacity alone. It will be won by making every shipment, warehouse task, and customer promise more intelligent, more predictable, and more profitable."></div>
+          <video class="hero-video" autoplay muted loop playsinline>
+            <source src="./assets/nx-hero.mp4" type="video/mp4" />
+          </video>
         </div>
       </div>
       <div class="right">
