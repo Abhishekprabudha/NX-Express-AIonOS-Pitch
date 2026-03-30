@@ -898,7 +898,7 @@ function startNarrationIfNeeded(){
   narrationStarted = true;
   if('speechSynthesis' in window){
     window.speechSynthesis.cancel();
-    introUtterance = speakText('Hello and welcome.', { pitch: 1.22, rate: 1.04, volume: 1 }, () => {
+    introUtterance = speakText('Good Morning', { pitch: 1.22, rate: 1.04, volume: 1 }, () => {
       introUtterance = null;
       if(playing) speakScene(currentScene);
     });
