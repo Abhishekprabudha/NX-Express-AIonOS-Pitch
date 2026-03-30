@@ -162,6 +162,58 @@
     .ops-card h4{margin:0 0 8px;font-size:16px}
     .ops-card p{margin:0;color:var(--muted);line-height:1.45;font-size:13px}
     .ask-box .big-ask{font-size:48px;font-weight:800;letter-spacing:-.04em;margin:10px 0}
+    .exec-close{
+      margin-top:18px;
+      padding:16px 18px;
+      border-radius:18px;
+      border:1px solid rgba(147,255,182,.36);
+      background:linear-gradient(120deg,rgba(109,211,255,.14),rgba(147,255,182,.1),rgba(255,209,102,.08));
+      position:relative;
+      overflow:hidden;
+      box-shadow:0 14px 36px rgba(6,20,36,.38);
+    }
+    .exec-close:before{
+      content:"";
+      position:absolute;
+      inset:-160% -20%;
+      background:linear-gradient(180deg,transparent,rgba(255,255,255,.24),transparent);
+      transform:rotate(22deg);
+      animation:execSweep 4.8s linear infinite;
+    }
+    .exec-close .close-line{
+      position:relative;
+      font-size:14px;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+      color:#d9e6fa;
+      margin-bottom:8px;
+    }
+    .exec-close .close-statement{
+      position:relative;
+      font-size:26px;
+      font-weight:800;
+      line-height:1.2;
+      background:linear-gradient(90deg,#f4fbff,#9fe4ff,#a7ffc8);
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+      animation:statementPulse 2.8s ease-in-out infinite;
+    }
+    .exec-close .close-signal{
+      position:relative;
+      margin-top:10px;
+      color:#c3d6ee;
+      font-size:14px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .exec-close .close-dot{
+      width:8px;height:8px;border-radius:50%;
+      background:#93ffb6;
+      box-shadow:0 0 12px rgba(147,255,182,.9);
+      animation:dotPulse 1.5s ease-in-out infinite;
+    }
     .ask-list{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:18px}
     .ask-item{padding:16px;border-radius:18px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04)}
     .ask-item b{display:block;font-size:14px;margin-bottom:6px}
@@ -171,6 +223,9 @@
     @keyframes pulse{50%{transform:scale(1.08)}}
     .float{animation:float 5s ease-in-out infinite}
     @keyframes float{50%{transform:translateY(-8px)}}
+    @keyframes execSweep{from{transform:translateX(-60%) translateY(-10%) rotate(22deg)}to{transform:translateX(60%) translateY(10%) rotate(22deg)}}
+    @keyframes statementPulse{50%{letter-spacing:.01em;text-shadow:0 0 24px rgba(109,211,255,.35)}}
+    @keyframes dotPulse{50%{transform:scale(1.45);opacity:.6}}
     .scan{position:absolute;inset:0;background:linear-gradient(180deg,transparent,rgba(109,211,255,.06),transparent);animation:scan 4s linear infinite;pointer-events:none}
     @keyframes scan{from{transform:translateY(-100%)}to{transform:translateY(100%)}}
     .glow-line{position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(109,211,255,.6),transparent)}
@@ -432,6 +487,11 @@
             <div class="mini-tag" style="left:auto;right:24px">Executive close</div>
             <div class="big-ask">Meet in 2 weeks</div>
             <div style="font-size:20px;color:#dce9fb;line-height:1.5">If approved, we can leave the room with one pilot, one KPI metric, and one go-live date.</div>
+            <div class="exec-close">
+              <div class="close-line">Concluding statement</div>
+              <div class="close-statement">One pilot. One KPI. One date. Momentum starts now.</div>
+              <div class="close-signal"><span class="close-dot"></span>Decision-ready plan in 14 days</div>
+            </div>
           </div>
           <div class="panel flow-box">
             <div class="mini-tag" style="left:auto;right:24px">Pilot economics</div>
@@ -743,20 +803,27 @@ function drawBarChart(canvasId, labels, values, colors){
   const rect=c.getBoundingClientRect();
   c.width=rect.width*dpr; c.height=rect.height*dpr;
   const ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
-  const w=rect.width,h=rect.height,p=36;
+  const w=rect.width,h=rect.height;
+  const pX=36, pTop=28, pBottom=80;
   ctx.clearRect(0,0,w,h);
   const max=Math.max(...values)*1.15;
-  const barW=(w-p*2)/values.length*0.58;
+  const chartHeight = h - pTop - pBottom;
+  const slotW=(w-pX*2)/values.length;
+  const barW=slotW*0.58;
   values.forEach((v,i)=>{
-    const x=p + i*((w-p*2)/values.length)+((w-p*2)/values.length-barW)/2;
-    const bh=(v/max)*(h-p*2);
-    const y=h-p-bh;
+    const x=pX + i*slotW+(slotW-barW)/2;
+    const bh=(v/max)*chartHeight;
+    const y=h-pBottom-bh;
     const grad=ctx.createLinearGradient(x,y,x,y+bh);
     grad.addColorStop(0,colors[i][0]); grad.addColorStop(1,colors[i][1]);
     ctx.fillStyle=grad;
     roundRect(ctx,x,y,barW,bh,16,true,false);
-    ctx.fillStyle='#dfeaff'; ctx.font='bold 16px Inter'; ctx.fillText(v+'%',x+barW/2-18,y-10);
-    ctx.fillStyle='#9db1cc'; ctx.font='12px Inter'; wrapText(ctx,labels[i],x-8,h-p+24,barW+16,15);
+    ctx.fillStyle='#dfeaff'; ctx.font='bold 16px Inter';
+    const pct = `${v}%`;
+    const pctW = ctx.measureText(pct).width;
+    ctx.fillText(pct,x+(barW-pctW)/2,y-10);
+    ctx.fillStyle='#9db1cc'; ctx.font='12px Inter';
+    wrapText(ctx,labels[i],x-8,h-pBottom+36,barW+16,15);
   });
 }
 
