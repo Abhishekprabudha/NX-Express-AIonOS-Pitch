@@ -687,7 +687,7 @@ function setupTruckAnimation(routeFeatures){
       const laneLngLat = offsetLngLatByScreenPixels(tm.route, p, tm.laneOffset);
       tm.marker.setLngLat(laneLngLat);
       const bearing = computeScreenBearingDegrees(tm.route, p);
-      tm.rotator.style.transform = `rotate(${bearing}deg)`;
+      tm.rotator.style.transform = `translate(-2px,-1px) rotate(${bearing}deg)`;
     });
     routeAnimationRaf = requestAnimationFrame(animate);
   };
