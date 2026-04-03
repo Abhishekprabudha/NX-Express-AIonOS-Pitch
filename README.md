@@ -54,3 +54,18 @@ Optional voice tuning:
 ```bash
 python scripts_generate_scene_narration.py --voice en-US-GuyNeural --rate +8% --pitch +2Hz
 ```
+
+## Run narration generation from GitHub (no local terminal)
+
+If you are working directly in the GitHub web UI, you can run narration generation via **GitHub Actions**:
+
+1. Open the **Actions** tab in your repo.
+2. Select **Generate Scene Narration**.
+3. Click **Run workflow**.
+4. (Optional) Set `voice`, `rate`, and `pitch` inputs.
+5. Run it and wait for completion.
+6. Open the workflow run and download the `scene-narration-mp3` artifact.
+
+The artifact contains generated files from `assets/`:
+- `scene_01.mp3`, `scene_02.mp3`, ...
+- `manifest.json`
