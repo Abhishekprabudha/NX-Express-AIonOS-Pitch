@@ -17,7 +17,7 @@ on:
         default: "+0Hz"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -43,6 +43,30 @@ jobs:
             --voice "${{ github.event.inputs.voice || 'en-US-AriaNeural' }}" \
             --rate "${{ github.event.inputs.rate || '+0%' }}" \
             --pitch "${{ github.event.inputs.pitch || '+0Hz' }}"
+
+
+      - name: Commit generated assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          shopt -s nullglob
+          files=(assets/scene_*.mp3 assets/manifest.json)
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No generated files found in assets/."
+            exit 1
+          fi
+
+          git add "${files[@]}"
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: update generated scene narration assets"
+          git push origin "HEAD:${{ github.ref_name }}"
 
       - name: Upload generated audio artifact
         uses: actions/upload-artifact@v4
