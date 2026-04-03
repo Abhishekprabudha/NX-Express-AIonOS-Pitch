@@ -1,0 +1,72 @@
+name: Generate Scene Narration
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_to_repo:
+        description: "Commit generated files back to the selected branch"
+        required: false
+        type: boolean
+        default: true
+      voice:
+        description: "Edge TTS voice (e.g., en-US-AriaNeural)"
+        required: false
+        default: "en-US-AriaNeural"
+      rate:
+        description: "Speech rate adjustment"
+        required: false
+        default: "+0%"
+      pitch:
+        description: "Speech pitch adjustment"
+        required: false
+        default: "+0Hz"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install edge-tts
+
+      - name: Generate narration files
+        run: |
+          python scripts_generate_scene_narration.py \
+            --voice "${{ github.event.inputs.voice || 'en-US-AriaNeural' }}" \
+            --rate "${{ github.event.inputs.rate || '+0%' }}" \
+            --pitch "${{ github.event.inputs.pitch || '+0Hz' }}"
+
+      - name: Upload generated audio artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scene-narration-mp3
+          path: |
+            assets/scene_*.mp3
+            assets/manifest.json
+          if-no-files-found: error
+
+      - name: Commit generated narration files
+        if: ${{ github.event.inputs.commit_to_repo == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/scene_*.mp3 assets/manifest.json
+          if git diff --cached --quiet; then
+            echo "No changes detected in generated narration files."
+            exit 0
+          fi
+          git commit -m "chore: update generated scene narration audio"
+          git push
