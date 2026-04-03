@@ -242,7 +242,10 @@
       .metric .k{font-size:30px}
       .ask-box .big-ask{font-size:40px}
     }
-  </style>
+  
+    body.export-mode{overflow:auto;background:#000}
+    body.export-mode .stage{margin:0 auto;max-width:none;max-height:none;border-radius:0}
+</style>
 </head>
 <body>
   <div class="stage">
@@ -295,14 +298,7 @@
           <div class="mini-tag">Footprint + growth narrative</div>
           <div class="map-wrap">
             <div class="map-region">
-              <video
-                src="./assets/nx-hero.mp4"
-                autoplay
-                muted
-                loop
-                playsinline
-                style="width:100%;height:100%;object-fit:cover;border-radius:18px;display:block;"
-              ></video>
+              <div id="indiaMap" aria-label="India network map"></div>
             </div>
             <div class="chart-card panel">
               <div class="chart-title"><h3>India scale pressure</h3><span>complexity index</span></div>
@@ -504,40 +500,41 @@
 
 <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
 <script>
+const SCENE_FADE_SEC = 0.85;
 const scenes = [...document.querySelectorAll('.scene')];
 const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const restartBtn = document.getElementById('restartBtn');
+const params = new URLSearchParams(window.location.search);
+const mode = params.get('mode') || 'preview';
+const targetWidth = Number(params.get('width')) || 1920;
+const targetHeight = Number(params.get('height')) || 1080;
+
 let map;
-let routeAnimationRaf = null;
 const truckMarkers = [];
-
-const BASE_WORDS_PER_SEC = 2.85;
-const VOICE_PITCH_MULTIPLIER = 1.4;
-const VOICE_RATE_MULTIPLIER = 0.98; // 30% slower than previous 1.4 baseline
-const sceneNarration = scenes.map(scene => scene.querySelector('.caption').dataset.caption);
-const estimatedSceneDurations = sceneNarration.map(text => Math.max(7, text.trim().split(/\s+/).length / BASE_WORDS_PER_SEC));
-const totalDuration = estimatedSceneDurations.reduce((sum,d)=>sum + d,0) + 3.4;
-
+const sceneAudio = [];
+let sceneDurations = scenes.map((scene) => Number(scene.dataset.duration) || 10);
+let sceneStartTimes = [];
+let totalDuration = 0;
 let currentScene = 0;
-let elapsed = 0;
 let playing = false;
+let playhead = 0;
 let lastTs = 0;
-let utterance = null;
-let introUtterance = null;
-let narrationStarted = false;
-let narrationRunning = false;
-let sceneStartElapsed = 0;
+let sceneAudioStartedAt = 0;
 let activeCaptionTimer = null;
+
+function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+function setExportCanvasSize(){
+  if(mode !== 'export') return;
+  document.body.classList.add('export-mode');
+  const stage = document.querySelector('.stage');
+  stage.style.width = `${targetWidth}px`;
+  stage.style.height = `${targetHeight}px`;
+}
 
 function interpolateLngLat(start, end, t){
   return [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t];
 }
-
-function clamp(v, min, max){
-  return Math.max(min, Math.min(max, v));
-}
-
 function progressOnRoute(route, t){
   const tt = clamp(t, 0, 1);
   if(route.length <= 1) return route[0];
@@ -547,7 +544,6 @@ function progressOnRoute(route, t){
   const localT = scaled - seg;
   return interpolateLngLat(route[seg], route[seg + 1], localT);
 }
-
 function computeScreenBearingDegrees(route, t){
   if(!map) return 0;
   const back = progressOnRoute(route, clamp(t - 0.01, 0, 1));
@@ -556,7 +552,6 @@ function computeScreenBearingDegrees(route, t){
   const p2 = map.project(fwd);
   return (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
 }
-
 function offsetLngLatByScreenPixels(route, t, laneOffsetPx){
   if(!map || !Number.isFinite(laneOffsetPx) || Math.abs(laneOffsetPx) < 0.01){
     return progressOnRoute(route, t);
@@ -575,137 +570,222 @@ function offsetLngLatByScreenPixels(route, t, laneOffsetPx){
   return map.unproject([pBase.x + nx * laneOffsetPx, pBase.y + ny * laneOffsetPx]).toArray();
 }
 
-function initIndiaMap(){
-  if(map || !window.maplibregl || !document.getElementById('indiaMap')) return;
-  map = new maplibregl.Map({
-    container: 'indiaMap',
-    style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-    center: [79.2, 22.7],
-    zoom: 2.32,
-    minZoom: 2.4,
-    maxZoom: 6.8,
-    attributionControl: false
+function configureTimeline(){
+  sceneStartTimes = [];
+  totalDuration = 0;
+  sceneDurations.forEach((duration) => {
+    sceneStartTimes.push(totalDuration);
+    totalDuration += duration;
   });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+}
 
-  const cities = [
-    { name: 'Delhi', coord: [77.1025, 28.7041] },
-    { name: 'Mumbai', coord: [72.8777, 19.076] },
-    { name: 'Nagpur', coord: [79.0882, 21.1458] },
-    { name: 'Bengaluru', coord: [77.5946, 12.9716] },
-    { name: 'Kolkata', coord: [88.3639, 22.5726] },
-    { name: 'Chennai', coord: [80.2707, 13.0827] }
-  ];
-  const routes = [
-    ['Delhi', 'Nagpur'],
-    ['Delhi', 'Kolkata'],
-    ['Mumbai', 'Nagpur'],
-    ['Nagpur', 'Bengaluru'],
-    ['Bengaluru', 'Chennai'],
-    ['Kolkata', 'Chennai'],
-    ['Mumbai', 'Delhi'],
-    ['Mumbai', 'Bengaluru']
-  ];
-  const byName = Object.fromEntries(cities.map(c => [c.name, c.coord]));
-  const routeFeatures = routes.map(([from, to], idx) => ({
-    type: 'Feature',
-    properties: { idx },
-    geometry: { type: 'LineString', coordinates: [byName[from], byName[to]] }
+function sceneIndexAt(timeSec){
+  for(let i = scenes.length - 1; i >= 0; i--){
+    if(timeSec >= sceneStartTimes[i]) return i;
+  }
+  return 0;
+}
+
+function updateCaptionForScene(index, localTime){
+  const cap = scenes[index]?.querySelector('.caption');
+  if(!cap) return;
+  const text = cap.dataset.caption || '';
+  const duration = sceneDurations[index] || 1;
+  const chars = Math.floor((clamp(localTime, 0, duration) / duration) * text.length);
+  cap.textContent = text.slice(0, chars);
+}
+
+function applySceneVisualState(timeSec){
+  const t = clamp(timeSec, 0, totalDuration);
+  const idx = sceneIndexAt(t);
+  currentScene = idx;
+  scenes.forEach((scene, i) => {
+    scene.classList.remove('active');
+    scene.style.opacity = '0';
+    scene.style.visibility = 'hidden';
+    scene.style.pointerEvents = 'none';
+    scene.style.transform = 'scale(1.02)';
+    if(i === idx || i === idx + 1 || i === idx - 1){
+      scene.style.visibility = 'visible';
+      scene.style.pointerEvents = 'auto';
+    }
+  });
+
+  const sceneStart = sceneStartTimes[idx];
+  const local = t - sceneStart;
+  const sceneDuration = sceneDurations[idx];
+  const fadeOutStart = Math.max(0, sceneDuration - SCENE_FADE_SEC);
+  let currentOpacity = 1;
+  if(local < SCENE_FADE_SEC && idx > 0){
+    currentOpacity = clamp(local / SCENE_FADE_SEC, 0, 1);
+    const prev = scenes[idx - 1];
+    prev.style.opacity = String(1 - currentOpacity);
+    prev.style.transform = `scale(${1 + (0.02 * currentOpacity)})`;
+    prev.classList.add('active');
+  }
+  if(local > fadeOutStart && idx < scenes.length - 1){
+    const out = clamp((local - fadeOutStart) / SCENE_FADE_SEC, 0, 1);
+    currentOpacity = 1 - out;
+    const next = scenes[idx + 1];
+    next.style.opacity = String(out);
+    next.style.transform = `scale(${1.02 - (0.02 * out)})`;
+    next.classList.add('active');
+  }
+
+  const current = scenes[idx];
+  current.style.opacity = String(currentOpacity);
+  current.style.transform = `scale(${1 + (0.02 * (1 - currentOpacity))})`;
+  current.classList.add('active');
+  updateCaptionForScene(idx, local);
+}
+
+function updateTruckPositions(timelineSec){
+  if(!map || !truckMarkers.length) return;
+  const ts = timelineSec * 1000;
+  truckMarkers.forEach((tm) => {
+    const elapsed = ts - tm.delay;
+    const loopDuration = tm.duration * 2;
+    const loopElapsed = ((elapsed % loopDuration) + loopDuration) % loopDuration;
+    const cycle = loopElapsed / tm.duration;
+    const p = cycle <= 1 ? cycle : 2 - cycle;
+    const laneLngLat = offsetLngLatByScreenPixels(tm.route, p, tm.laneOffset);
+    tm.marker.setLngLat(laneLngLat);
+    const bearing = computeScreenBearingDegrees(tm.route, p);
+    tm.rotator.style.transform = `translate(-2px,-1px) rotate(${bearing}deg)`;
+  });
+}
+
+function syncSceneAudio(timeSec){
+  if(mode === 'export') return;
+  const idx = sceneIndexAt(timeSec);
+  const audio = sceneAudio[idx];
+  if(!audio) return;
+  if(currentScene !== idx || audio.paused){
+    sceneAudio.forEach((a, i) => { if(i !== idx){ a.pause(); a.currentTime = 0; }});
+    currentScene = idx;
+    sceneAudioStartedAt = sceneStartTimes[idx];
+    const target = clamp(timeSec - sceneAudioStartedAt, 0, audio.duration || 0);
+    audio.currentTime = target;
+    if(playing){
+      audio.play().catch(() => {});
+    }
+  }
+}
+
+function renderAt(timeSec){
+  applySceneVisualState(timeSec);
+  updateTruckPositions(timeSec);
+}
+
+function tick(ts){
+  if(!playing) return;
+  if(!lastTs) lastTs = ts;
+  const delta = (ts - lastTs) / 1000;
+  lastTs = ts;
+  playhead = clamp(playhead + delta, 0, totalDuration);
+  renderAt(playhead);
+  syncSceneAudio(playhead);
+
+  const activeAudio = sceneAudio[currentScene];
+  if(activeAudio && !activeAudio.paused){
+    const expected = playhead - sceneStartTimes[currentScene];
+    if(Math.abs(activeAudio.currentTime - expected) > 0.12){
+      activeAudio.currentTime = clamp(expected, 0, activeAudio.duration || 0);
+    }
+  }
+
+  if(playhead >= totalDuration){
+    playing = false;
+    sceneAudio.forEach((audio) => audio.pause());
+    return;
+  }
+  requestAnimationFrame(tick);
+}
+
+function play(){
+  if(playing) return;
+  playing = true;
+  lastTs = 0;
+  syncSceneAudio(playhead);
+  requestAnimationFrame(tick);
+}
+function pause(){
+  playing = false;
+  sceneAudio.forEach((audio) => audio.pause());
+}
+function restart(){
+  pause();
+  playhead = 0;
+  sceneAudio.forEach((audio) => {
+    audio.pause();
+    audio.currentTime = 0;
+  });
+  renderAt(playhead);
+  play();
+}
+
+function buildNarrationAudio(index){
+  const clip = new Audio(`./assets/narration/scene-${String(index + 1).padStart(2, '0')}.mp3`);
+  clip.preload = 'metadata';
+  clip.crossOrigin = 'anonymous';
+  return clip;
+}
+
+async function loadNarrationDurations(){
+  const loads = scenes.map((_, i) => new Promise((resolve) => {
+    const clip = buildNarrationAudio(i);
+    sceneAudio.push(clip);
+    const done = () => resolve(Number.isFinite(clip.duration) && clip.duration > 0 ? clip.duration : sceneDurations[i]);
+    clip.addEventListener('loadedmetadata', done, { once: true });
+    clip.addEventListener('error', () => resolve(sceneDurations[i]), { once: true });
   }));
+  sceneDurations = await Promise.all(loads);
+  configureTimeline();
+}
 
-  map.on('load', async () => {
-    map.addSource('routes', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: routeFeatures }
+function initIndiaMap(){
+  if(map || !window.maplibregl || !document.getElementById('indiaMap')) return Promise.resolve();
+  return new Promise((resolve) => {
+    map = new maplibregl.Map({
+      container: 'indiaMap',
+      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      center: [79.2, 22.7],
+      zoom: 3.35,
+      minZoom: 2.8,
+      maxZoom: 6.8,
+      attributionControl: false
     });
-    map.addLayer({
-      id: 'route-lines-white',
-      type: 'line',
-      source: 'routes',
-      paint: {
-        'line-color': '#ffffff',
-        'line-width': 2.2,
-        'line-offset': -2.2,
-        'line-opacity': 0.95
-      }
-    });
-    map.addLayer({
-      id: 'route-lines-blue',
-      type: 'line',
-      source: 'routes',
-      paint: {
-        'line-color': '#2f78ff',
-        'line-width': 2.2,
-        'line-offset': 0,
-        'line-opacity': 0.88
-      }
-    });
-    map.addLayer({
-      id: 'route-lines-green',
-      type: 'line',
-      source: 'routes',
-      paint: {
-        'line-color': '#79da42',
-        'line-width': 2.2,
-        'line-offset': 2.2,
-        'line-opacity': 0.88
-      }
-    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-    map.addSource('cities', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: cities.map(c => ({
-          type: 'Feature',
-          properties: { name: c.name },
-          geometry: { type: 'Point', coordinates: c.coord }
-        }))
-      }
-    });
-    map.addLayer({
-      id: 'city-dots',
-      type: 'circle',
-      source: 'cities',
-      paint: {
-        'circle-radius': 4.5,
-        'circle-color': '#00a3ff',
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 1.3
-      }
-    });
-    map.addLayer({
-      id: 'city-labels',
-      type: 'symbol',
-      source: 'cities',
-      layout: {
-        'text-field': ['get', 'name'],
-        'text-size': 11,
-        'text-offset': [0.8, 0],
-        'text-anchor': 'left'
-      },
-      paint: {
-        'text-color': '#10253f',
-        'text-halo-color': '#ffffff',
-        'text-halo-width': 1
-      }
-    });
+    const cities = [
+      { name: 'Delhi', coord: [77.1025, 28.7041] },
+      { name: 'Mumbai', coord: [72.8777, 19.076] },
+      { name: 'Nagpur', coord: [79.0882, 21.1458] },
+      { name: 'Bengaluru', coord: [77.5946, 12.9716] },
+      { name: 'Kolkata', coord: [88.3639, 22.5726] },
+      { name: 'Chennai', coord: [80.2707, 13.0827] }
+    ];
+    const routes = [
+      ['Delhi', 'Nagpur'], ['Delhi', 'Kolkata'], ['Mumbai', 'Nagpur'], ['Nagpur', 'Bengaluru'],
+      ['Bengaluru', 'Chennai'], ['Kolkata', 'Chennai'], ['Mumbai', 'Delhi'], ['Mumbai', 'Bengaluru']
+    ];
+    const byName = Object.fromEntries(cities.map(c => [c.name, c.coord]));
+    const routeFeatures = routes.map(([from, to], idx) => ({
+      type: 'Feature', properties: { idx }, geometry: { type: 'LineString', coordinates: [byName[from], byName[to]] }
+    }));
 
-    try {
-      const res = await fetch('https://raw.githubusercontent.com/geohacker/india/master/state/india.geojson');
-      if(res.ok){
-        const gj = await res.json();
-        map.addSource('india-outline', { type:'geojson', data: gj });
-        map.addLayer({
-          id:'india-outline-layer',
-          type:'line',
-          source:'india-outline',
-          paint:{ 'line-color':'#101010', 'line-width':2.2 }
-        });
-      }
-    } catch (e) {}
+    map.on('load', async () => {
+      map.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features: routeFeatures } });
+      map.addLayer({ id: 'route-lines-white', type: 'line', source: 'routes', paint: { 'line-color': '#ffffff', 'line-width': 2.2, 'line-offset': -2.2, 'line-opacity': 0.95 }});
+      map.addLayer({ id: 'route-lines-blue', type: 'line', source: 'routes', paint: { 'line-color': '#2f78ff', 'line-width': 2.2, 'line-offset': 0, 'line-opacity': 0.88 }});
+      map.addLayer({ id: 'route-lines-green', type: 'line', source: 'routes', paint: { 'line-color': '#79da42', 'line-width': 2.2, 'line-offset': 2.2, 'line-opacity': 0.88 }});
+      map.addSource('cities', { type: 'geojson', data: { type: 'FeatureCollection', features: cities.map(c => ({ type: 'Feature', properties: { name: c.name }, geometry: { type: 'Point', coordinates: c.coord }})) }});
+      map.addLayer({ id: 'city-dots', type: 'circle', source: 'cities', paint: { 'circle-radius': 4.5, 'circle-color': '#00a3ff', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.3 }});
+      map.addLayer({ id: 'city-labels', type: 'symbol', source: 'cities', layout: { 'text-field': ['get', 'name'], 'text-size': 11, 'text-offset': [0.8, 0], 'text-anchor': 'left' }, paint: { 'text-color': '#10253f', 'text-halo-color': '#ffffff', 'text-halo-width': 1 }});
 
-    setupTruckAnimation(routeFeatures);
+      setupTruckAnimation(routeFeatures);
+      resolve();
+    });
   });
 }
 
@@ -729,33 +809,9 @@ function setupTruckAnimation(routeFeatures){
       el.append(rotator);
       const startLngLat = offsetLngLatByScreenPixels(feature.geometry.coordinates, 0, laneOffset);
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(startLngLat).addTo(map);
-      truckMarkers.push({
-        marker,
-        rotator,
-        route: feature.geometry.coordinates,
-        laneOffset,
-        duration: 4200 + (i * 210),
-        delay: i * 120
-      });
+      truckMarkers.push({ marker, rotator, route: feature.geometry.coordinates, laneOffset, duration: 4200 + (i * 210), delay: i * 120 });
     });
   });
-
-  const t0 = performance.now();
-  const animate = (ts) => {
-    truckMarkers.forEach((tm) => {
-      const elapsed = ts - t0 - tm.delay;
-      const loopDuration = tm.duration * 2;
-      const loopElapsed = ((elapsed % loopDuration) + loopDuration) % loopDuration;
-      const cycle = loopElapsed / tm.duration;
-      const p = cycle <= 1 ? cycle : 2 - cycle;
-      const laneLngLat = offsetLngLatByScreenPixels(tm.route, p, tm.laneOffset);
-      tm.marker.setLngLat(laneLngLat);
-      const bearing = computeScreenBearingDegrees(tm.route, p);
-      tm.rotator.style.transform = `translate(-2px,-1px) rotate(${bearing}deg)`;
-    });
-    routeAnimationRaf = requestAnimationFrame(animate);
-  };
-  routeAnimationRaf = requestAnimationFrame(animate);
 }
 
 function drawLineChart(canvasId, series, opts={}){
@@ -767,65 +823,28 @@ function drawLineChart(canvasId, series, opts={}){
   const w=rect.width,h=rect.height,p=32;
   ctx.clearRect(0,0,w,h);
   ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
-  for(let i=0;i<5;i++){
-    const y=p+i*(h-p*2)/4; ctx.beginPath(); ctx.moveTo(p,y); ctx.lineTo(w-p,y); ctx.stroke();
-  }
+  for(let i=0;i<5;i++){ const y=p+i*(h-p*2)/4; ctx.beginPath(); ctx.moveTo(p,y); ctx.lineTo(w-p,y); ctx.stroke(); }
   const max=Math.max(...series.flatMap(s=>s.data))*1.1;
-  series.forEach((s,idx)=>{
-    const grad=ctx.createLinearGradient(0,0,w,0);
-    grad.addColorStop(0,s.color1); grad.addColorStop(1,s.color2);
+  series.forEach((s)=>{
+    const grad=ctx.createLinearGradient(0,0,w,0); grad.addColorStop(0,s.color1); grad.addColorStop(1,s.color2);
     ctx.strokeStyle=grad; ctx.lineWidth=3; ctx.beginPath();
-    s.data.forEach((v,i)=>{
-      const x=p+i*(w-p*2)/(s.data.length-1);
-      const y=h-p-(v/max)*(h-p*2);
-      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    });
+    s.data.forEach((v,i)=>{ const x=p+i*(w-p*2)/(s.data.length-1); const y=h-p-(v/max)*(h-p*2); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
     ctx.stroke();
-    s.data.forEach((v,i)=>{
-      const x=p+i*(w-p*2)/(s.data.length-1);
-      const y=h-p-(v/max)*(h-p*2);
-      ctx.fillStyle=s.color1; ctx.beginPath(); ctx.arc(x,y,4.2,0,Math.PI*2); ctx.fill();
-    });
+    s.data.forEach((v,i)=>{ const x=p+i*(w-p*2)/(s.data.length-1); const y=h-p-(v/max)*(h-p*2); ctx.fillStyle=s.color1; ctx.beginPath(); ctx.arc(x,y,4.2,0,Math.PI*2); ctx.fill(); });
   });
   if(opts.legend!==false){
-    series.forEach((s,i)=>{
-      const x=p+i*160; const y=18;
-      ctx.fillStyle=s.color1; ctx.fillRect(x,y,18,4);
-      ctx.fillStyle='rgba(234,242,255,.9)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(s.label,x+26,y+6);
-    });
+    series.forEach((s,i)=>{ const x=p+i*160; const y=18; ctx.fillStyle=s.color1; ctx.fillRect(x,y,18,4); ctx.fillStyle='rgba(234,242,255,.9)'; ctx.font='12px Inter, sans-serif'; ctx.fillText(s.label,x+26,y+6); });
   }
 }
-
 function drawBarChart(canvasId, labels, values, colors){
   const c=document.getElementById(canvasId); if(!c) return;
   const dpr=window.devicePixelRatio||1;
-  const rect=c.getBoundingClientRect();
-  c.width=rect.width*dpr; c.height=rect.height*dpr;
+  const rect=c.getBoundingClientRect(); c.width=rect.width*dpr; c.height=rect.height*dpr;
   const ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
-  const w=rect.width,h=rect.height;
-  const pX=36, pTop=28, pBottom=80;
-  ctx.clearRect(0,0,w,h);
-  const max=Math.max(...values)*1.15;
-  const chartHeight = h - pTop - pBottom;
-  const slotW=(w-pX*2)/values.length;
-  const barW=slotW*0.58;
-  values.forEach((v,i)=>{
-    const x=pX + i*slotW+(slotW-barW)/2;
-    const bh=(v/max)*chartHeight;
-    const y=h-pBottom-bh;
-    const grad=ctx.createLinearGradient(x,y,x,y+bh);
-    grad.addColorStop(0,colors[i][0]); grad.addColorStop(1,colors[i][1]);
-    ctx.fillStyle=grad;
-    roundRect(ctx,x,y,barW,bh,16,true,false);
-    ctx.fillStyle='#dfeaff'; ctx.font='bold 16px Inter';
-    const pct = `${v}%`;
-    const pctW = ctx.measureText(pct).width;
-    ctx.fillText(pct,x+(barW-pctW)/2,y-10);
-    ctx.fillStyle='#9db1cc'; ctx.font='12px Inter';
-    wrapText(ctx,labels[i],x-8,h-pBottom+36,barW+16,15);
-  });
+  const w=rect.width,h=rect.height; const pX=36, pTop=28, pBottom=80;
+  ctx.clearRect(0,0,w,h); const max=Math.max(...values)*1.15; const chartHeight = h - pTop - pBottom; const slotW=(w-pX*2)/values.length; const barW=slotW*0.58;
+  values.forEach((v,i)=>{ const x=pX + i*slotW+(slotW-barW)/2; const bh=(v/max)*chartHeight; const y=h-pBottom-bh; const grad=ctx.createLinearGradient(x,y,x,y+bh); grad.addColorStop(0,colors[i][0]); grad.addColorStop(1,colors[i][1]); ctx.fillStyle=grad; roundRect(ctx,x,y,barW,bh,16,true,false); ctx.fillStyle='#dfeaff'; ctx.font='bold 16px Inter'; const pct = `${v}%`; const pctW = ctx.measureText(pct).width; ctx.fillText(pct,x+(barW-pctW)/2,y-10); ctx.fillStyle='#9db1cc'; ctx.font='12px Inter'; wrapText(ctx,labels[i],x-8,h-pBottom+36,barW+16,15); });
 }
-
 function drawRadar(canvasId){
   const c=document.getElementById(canvasId); if(!c) return;
   const dpr=window.devicePixelRatio||1;
@@ -833,212 +852,53 @@ function drawRadar(canvasId){
   const ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
   const w=rect.width,h=rect.height; ctx.clearRect(0,0,w,h);
   const cx=w/2, cy=h/2+10, r=Math.min(w,h)*0.28;
-  const labels=['Warehouse\nCongestion','Exception\nLatency','ETA\nVariance','Manual\nTouchpoints','SLA\nRisk','Customer\nAnxiety'];
+  const labels=['Warehouse\\nCongestion','Exception\\nLatency','ETA\\nVariance','Manual\\nTouchpoints','SLA\\nRisk','Customer\\nAnxiety'];
   const before=[80,78,70,74,76,72]; const after=[44,46,38,41,43,35];
-  for(let level=1; level<=5; level++){
-    ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.beginPath();
-    for(let i=0;i<6;i++){
-      const a=-Math.PI/2 + i*(Math.PI*2/6); const rr=r*level/5;
-      const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr;
-      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    }
-    ctx.closePath(); ctx.stroke();
-  }
-  labels.forEach((lab,i)=>{
-    const a=-Math.PI/2 + i*(Math.PI*2/6); const x=cx+Math.cos(a)*(r+24), y=cy+Math.sin(a)*(r+24);
-    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r); ctx.stroke();
-    ctx.fillStyle='#9db1cc'; ctx.font='12px Inter'; lab.split('\n').forEach((t,j)=>ctx.fillText(t,x-26,y+j*14));
-  });
-  [['rgba(255,107,122,.18)','#ff6b7a',before],['rgba(109,211,255,.18)','#6dd3ff',after]].forEach(([fill,stroke,data])=>{
-    ctx.beginPath();
-    data.forEach((v,i)=>{
-      const a=-Math.PI/2 + i*(Math.PI*2/6); const rr=r*(v/100); const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr;
-      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    });
-    ctx.closePath(); ctx.fillStyle=fill; ctx.strokeStyle=stroke; ctx.lineWidth=3; ctx.fill(); ctx.stroke();
-  });
+  for(let level=1; level<=5; level++){ ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.beginPath(); for(let i=0;i<6;i++){ const a=-Math.PI/2 + i*(Math.PI*2/6); const rr=r*level/5; const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.closePath(); ctx.stroke(); }
+  labels.forEach((lab,i)=>{ const a=-Math.PI/2 + i*(Math.PI*2/6); const x=cx+Math.cos(a)*(r+24), y=cy+Math.sin(a)*(r+24); ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r); ctx.stroke(); ctx.fillStyle='#9db1cc'; ctx.font='12px Inter'; lab.split('\\n').forEach((t,j)=>ctx.fillText(t,x-26,y+j*14)); });
+  [['rgba(255,107,122,.18)','#ff6b7a',before],['rgba(109,211,255,.18)','#6dd3ff',after]].forEach(([fill,stroke,data])=>{ ctx.beginPath(); data.forEach((v,i)=>{ const a=-Math.PI/2 + i*(Math.PI*2/6); const rr=r*(v/100); const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.closePath(); ctx.fillStyle=fill; ctx.strokeStyle=stroke; ctx.lineWidth=3; ctx.fill(); ctx.stroke(); });
   ctx.fillStyle='#eaf2ff'; ctx.font='bold 14px Inter'; ctx.fillText('Before AI-led intervention',24,28); ctx.fillStyle='#ff6b7a'; ctx.fillRect(230,17,20,4);
   ctx.fillStyle='#eaf2ff'; ctx.fillText('After AIonOS intervention',24,50); ctx.fillStyle='#6dd3ff'; ctx.fillRect(220,39,20,4);
 }
-
-function roundRect(ctx,x,y,w,h,r,fill,stroke){
-  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); if(fill) ctx.fill(); if(stroke) ctx.stroke();
-}
-function wrapText(ctx,text,x,y,maxWidth,lineHeight){
-  const words=text.split(' '); let line=''; let yy=y;
-  words.forEach(word=>{ const test=line+word+' '; if(ctx.measureText(test).width>maxWidth && line){ctx.fillText(line,x,yy); line=word+' '; yy+=lineHeight;} else line=test;});
-  if(line) ctx.fillText(line,x,yy);
-}
-
+function roundRect(ctx,x,y,w,h,r,fill,stroke){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); if(fill) ctx.fill(); if(stroke) ctx.stroke(); }
+function wrapText(ctx,text,x,y,maxWidth,lineHeight){ const words=text.split(' '); let line=''; let yy=y; words.forEach(word=>{ const test=line+word+' '; if(ctx.measureText(test).width>maxWidth && line){ctx.fillText(line,x,yy); line=word+' '; yy+=lineHeight;} else line=test;}); if(line) ctx.fillText(line,x,yy); }
 function resizeAllCharts(){
-  drawLineChart('chart1',[
-    {label:'Network volume',data:[38,47,57,68,78,88],color1:'#6dd3ff',color2:'#8b8cff'},
-    {label:'Operational complexity',data:[32,52,76,102,131,164],color1:'#93ffb6',color2:'#49d7a5'}
-  ]);
-  drawLineChart('chart2',[
-    {label:'OTIF confidence',data:[62,66,71,77,84,91],color1:'#93ffb6',color2:'#45d39b'},
-    {label:'Customer anxiety',data:[74,68,61,53,45,37],color1:'#ffd166',color2:'#ff8f5a'}
-  ]);
+  drawLineChart('chart1',[{label:'Network volume',data:[38,47,57,68,78,88],color1:'#6dd3ff',color2:'#8b8cff'},{label:'Operational complexity',data:[32,52,76,102,131,164],color1:'#93ffb6',color2:'#49d7a5'}]);
+  drawLineChart('chart2',[{label:'OTIF confidence',data:[62,66,71,77,84,91],color1:'#93ffb6',color2:'#45d39b'},{label:'Customer anxiety',data:[74,68,61,53,45,37],color1:'#ffd166',color2:'#ff8f5a'}]);
   drawRadar('chart3');
   drawBarChart('chart4', ['Planning latency reduction','Exception handling improvement','Faster risk intervention','Service reliability uplift'], [20,30,24,18], [['#6dd3ff','#7b8cff'],['#93ffb6','#45d39b'],['#ffd166','#ff935c'],['#d0a7ff','#7f8cff']]);
 }
 
-function showScene(index){
-  scenes.forEach((s,i)=>s.classList.toggle('active', i===index));
-  const cap = scenes[index].querySelector('.caption');
-  const sceneDuration = estimatedSceneDurations[index] || 10;
-  typeCaption(cap, cap.dataset.caption, sceneDuration);
-}
+async function init(){
+  setExportCanvasSize();
+  await loadNarrationDurations();
+  await initIndiaMap();
+  resizeAllCharts();
+  renderAt(0);
 
-function typeCaption(el, text, sceneDurationSec = 10){
-  if(activeCaptionTimer) clearInterval(activeCaptionTimer);
-  el.textContent='';
-  let i=0;
-  const intervalMs=Math.max(15, Math.floor((sceneDurationSec * 1000) / Math.max(1, text.length)));
-  activeCaptionTimer=setInterval(()=>{
-    if(!scenes[currentScene].classList.contains('active')){clearInterval(activeCaptionTimer); return;}
-    el.textContent=text.slice(0, i++);
-    if(i>text.length){
-      clearInterval(activeCaptionTimer);
-      activeCaptionTimer = null;
-    }
-  }, intervalMs);
-}
-
-function pickEnergeticMaleVoice(){
-  const voices = speechSynthesis.getVoices();
-  const britishMale = voices.find(v =>
-    /en-GB/i.test(v.lang || '') &&
-    /male|man|masculine|david|guy|ryan|brian|tom|alex|mark/i.test(v.name || '')
-  );
-  if(britishMale) return britishMale;
-
-  return voices.find(v=>/Google UK English Male|Microsoft Ryan|Microsoft George|Daniel|Thomas|Arthur|Oliver/i.test(v.name))
-    || voices.find(v=>/en-GB/i.test(v.lang || ''))
-    || voices.find(v=>/male|man|masculine/i.test(v.name))
-    || voices[0];
-}
-
-function speakText(text, cfg = {}, onEnd){
-  if(!('speechSynthesis' in window) || !text){
-    if(typeof onEnd === 'function') onEnd();
-    return null;
-  }
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'en-GB';
-  u.rate = Math.min(10, (cfg.rate ?? 1.06) * VOICE_RATE_MULTIPLIER);
-  u.pitch = Math.min(2, (cfg.pitch ?? 1.2) * VOICE_PITCH_MULTIPLIER);
-  u.volume = cfg.volume ?? 1;
-  const voice = pickEnergeticMaleVoice();
-  if(voice) u.voice = voice;
-  if(typeof onEnd === 'function') u.onend = onEnd;
-  speechSynthesis.speak(u);
-  return u;
-}
-
-function speakScene(sceneIndex){
-  if(!playing || sceneIndex !== currentScene) return;
-  const baseText = sceneNarration[sceneIndex];
-  const energeticLead = sceneIndex === 0
-    ? 'Hi everyone, welcome. Let\'s dive in with energy.'
-    : '';
-  const payload = `${energeticLead} ${baseText}`.trim();
-  const pitch = 1.18 + ((sceneIndex % 3) * 0.08);
-  const rate = 1.02 + ((sceneIndex % 2) * 0.05);
-
-  narrationRunning = true;
-  utterance = speakText(payload, { pitch, rate, volume: 1 }, () => {
-    utterance = null;
-    narrationRunning = false;
-    if(!playing) return;
-    const holdForMs = 320;
-    setTimeout(() => {
-      if(!playing) return;
-      advanceScene();
-    }, holdForMs);
-  });
-}
-
-function startNarrationIfNeeded(){
-  if(narrationStarted) return;
-  narrationStarted = true;
-  if('speechSynthesis' in window){
-    window.speechSynthesis.cancel();
-    introUtterance = speakText('Good Morning', { pitch: 1.22, rate: 1.04, volume: 1 }, () => {
-      introUtterance = null;
-      if(playing) speakScene(currentScene);
-    });
+  playBtn.onclick = () => play();
+  pauseBtn.onclick = () => pause();
+  restartBtn.onclick = () => restart();
+  if(mode === 'export'){
+    document.querySelector('.controls').style.display = 'none';
+    window.__NARRATIVE_EXPORT__ = {
+      ready: Promise.resolve(true),
+      getDuration: () => totalDuration,
+      renderAt: async (timeSec) => {
+        playhead = clamp(timeSec, 0, totalDuration);
+        renderAt(playhead);
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      }
+    };
   }
 }
 
-function advanceScene(){
-  currentScene++;
-  if(currentScene>=scenes.length){
-    playing=false;
-    currentScene=scenes.length-1;
-    return;
-  }
-  showScene(currentScene);
-  sceneStartElapsed = elapsed;
-  if('speechSynthesis' in window) speakScene(currentScene);
-}
+window.addEventListener('resize', () => {
+  resizeAllCharts();
+  renderAt(playhead);
+});
 
-function tick(ts){
-  if(!playing) return;
-  if(!lastTs) lastTs=ts;
-  const delta=(ts-lastTs)/1000;
-  lastTs=ts;
-  elapsed+=delta;
-  const pct=Math.min(100,(elapsed/totalDuration)*100);
-
-  if(!('speechSynthesis' in window) && elapsed - sceneStartElapsed >= (estimatedSceneDurations[currentScene] || 10)){
-    advanceScene();
-  }
-
-  requestAnimationFrame(tick);
-}
-
-function play(){
-  if(playing) return;
-  playing=true;
-  lastTs=0;
-  startNarrationIfNeeded();
-  if('speechSynthesis' in window){
-    window.speechSynthesis.resume();
-    if(!narrationRunning && narrationStarted && !introUtterance && !utterance){
-      speakScene(currentScene);
-    }
-  }
-  requestAnimationFrame(tick);
-}
-function pause(){
-  playing=false;
-  window.speechSynthesis?.pause();
-}
-function restart(){
-  playing=false;
-  elapsed=0;
-  currentScene=0;
-  lastTs=0;
-  sceneStartElapsed=0;
-  narrationStarted = false;
-  narrationRunning = false;
-  utterance = null;
-  introUtterance = null;
-  window.speechSynthesis?.cancel();
-  showScene(0);
-  play();
-}
-
-playBtn.onclick=()=>{window.speechSynthesis?.resume(); play();};
-pauseBtn.onclick=()=>pause();
-restartBtn.onclick=()=>restart();
-window.addEventListener('resize', resizeAllCharts);
-window.speechSynthesis?.onvoiceschanged?.();
-
-initIndiaMap();
-resizeAllCharts();
-showScene(0);
+init();
 </script>
 </body>
 </html>
