@@ -523,12 +523,12 @@ let currentScene = 0;
 let elapsed = 0;
 let playing = false;
 let lastTs = 0;
-let utterance = null;
-let introUtterance = null;
 let narrationStarted = false;
 let narrationRunning = false;
 let sceneStartElapsed = 0;
 let activeCaptionTimer = null;
+let narrationQueue = [];
+let activeNarrationIndex = -1;
 
 function interpolateLngLat(start, end, t){
   return [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t];
@@ -919,55 +919,75 @@ function pickEnergeticMaleVoice(){
     || voices[0];
 }
 
-function speakText(text, cfg = {}, onEnd){
-  if(!('speechSynthesis' in window) || !text){
-    if(typeof onEnd === 'function') onEnd();
-    return null;
-  }
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'en-GB';
-  u.rate = Math.min(10, (cfg.rate ?? 1.06) * VOICE_RATE_MULTIPLIER);
-  u.pitch = Math.min(2, (cfg.pitch ?? 1.2) * VOICE_PITCH_MULTIPLIER);
-  u.volume = cfg.volume ?? 1;
-  const voice = pickEnergeticMaleVoice();
-  if(voice) u.voice = voice;
-  if(typeof onEnd === 'function') u.onend = onEnd;
-  speechSynthesis.speak(u);
-  return u;
-}
+function queueNarration(){
+  if(!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  narrationQueue = [];
+  activeNarrationIndex = -1;
 
-function speakScene(sceneIndex){
-  if(!playing || sceneIndex !== currentScene) return;
-  const baseText = sceneNarration[sceneIndex];
-  const energeticLead = sceneIndex === 0
-    ? 'Hi everyone, welcome. Let\'s dive in with energy.'
-    : '';
-  const payload = `${energeticLead} ${baseText}`.trim();
-  const pitch = 1.18 + ((sceneIndex % 3) * 0.08);
-  const rate = 1.02 + ((sceneIndex % 2) * 0.05);
+  const intro = new SpeechSynthesisUtterance('Good Morning');
+  intro.lang = 'en-GB';
+  intro.rate = Math.min(10, 1.04 * VOICE_RATE_MULTIPLIER);
+  intro.pitch = Math.min(2, 1.22 * VOICE_PITCH_MULTIPLIER);
+  intro.volume = 1;
+  const introVoice = pickEnergeticMaleVoice();
+  if(introVoice) intro.voice = introVoice;
+  intro.onstart = () => {
+    narrationRunning = true;
+    activeNarrationIndex = -1;
+  };
+  intro.onend = () => {
+    if(activeNarrationIndex < 0 && playing){
+      showScene(0);
+      sceneStartElapsed = elapsed;
+    }
+  };
+  narrationQueue.push(intro);
 
-  narrationRunning = true;
-  utterance = speakText(payload, { pitch, rate, volume: 1 }, () => {
-    utterance = null;
-    narrationRunning = false;
-    if(!playing) return;
-    const holdForMs = 320;
-    setTimeout(() => {
+  sceneNarration.forEach((baseText, sceneIndex) => {
+    const energeticLead = sceneIndex === 0
+      ? 'Hi everyone, welcome. Let\'s dive in with energy.'
+      : '';
+    const payload = `${energeticLead} ${baseText}`.trim();
+    const pitch = 1.18 + ((sceneIndex % 3) * 0.08);
+    const rate = 1.02 + ((sceneIndex % 2) * 0.05);
+    const u = new SpeechSynthesisUtterance(payload);
+    u.lang = 'en-GB';
+    u.rate = Math.min(10, rate * VOICE_RATE_MULTIPLIER);
+    u.pitch = Math.min(2, pitch * VOICE_PITCH_MULTIPLIER);
+    u.volume = 1;
+    const voice = pickEnergeticMaleVoice();
+    if(voice) u.voice = voice;
+    u.onstart = () => {
       if(!playing) return;
-      advanceScene();
-    }, holdForMs);
+      narrationRunning = true;
+      activeNarrationIndex = sceneIndex;
+      if(sceneIndex !== currentScene){
+        currentScene = sceneIndex;
+      }
+      showScene(currentScene);
+      sceneStartElapsed = elapsed;
+    };
+    u.onend = () => {
+      if(activeNarrationIndex === sceneIndex){
+        activeNarrationIndex = -1;
+      }
+      if(sceneIndex === scenes.length - 1){
+        narrationRunning = false;
+        playing = false;
+      }
+    };
+    narrationQueue.push(u);
   });
+
+  narrationQueue.forEach((u) => window.speechSynthesis.speak(u));
 }
 
 function startNarrationIfNeeded(){
   if(narrationStarted) return;
   narrationStarted = true;
   if('speechSynthesis' in window){
-    window.speechSynthesis.cancel();
-    introUtterance = speakText('Good Morning', { pitch: 1.22, rate: 1.04, volume: 1 }, () => {
-      introUtterance = null;
-      if(playing) speakScene(currentScene);
-    });
+    queueNarration();
   }
 }
 
@@ -980,7 +1000,6 @@ function advanceScene(){
   }
   showScene(currentScene);
   sceneStartElapsed = elapsed;
-  if('speechSynthesis' in window) speakScene(currentScene);
 }
 
 function tick(ts){
@@ -1005,8 +1024,8 @@ function play(){
   startNarrationIfNeeded();
   if('speechSynthesis' in window){
     window.speechSynthesis.resume();
-    if(!narrationRunning && narrationStarted && !introUtterance && !utterance){
-      speakScene(currentScene);
+    if(!narrationRunning && narrationStarted){
+      queueNarration();
     }
   }
   requestAnimationFrame(tick);
@@ -1023,8 +1042,8 @@ function restart(){
   sceneStartElapsed=0;
   narrationStarted = false;
   narrationRunning = false;
-  utterance = null;
-  introUtterance = null;
+  narrationQueue = [];
+  activeNarrationIndex = -1;
   window.speechSynthesis?.cancel();
   showScene(0);
   play();
