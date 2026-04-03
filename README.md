@@ -46,6 +46,7 @@ python scripts_generate_scene_narration.py
 ```
 
 This creates:
+- `assets/intro_00.mp3` (opening greeting narration)
 - `assets/scene_01.mp3`, `scene_02.mp3`, ...
 - `assets/manifest.json` (scene text + file mapping)
 
@@ -68,5 +69,6 @@ If you are working directly in the GitHub web UI, you can run narration generati
 7. (Optional) Open the workflow run and download the `scene-narration-mp3` artifact.
 
 The commit/artifact contains generated files from `assets/`:
+- `intro_00.mp3`
 - `scene_01.mp3`, `scene_02.mp3`, ...
 - `manifest.json`

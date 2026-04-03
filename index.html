@@ -527,6 +527,8 @@ let lastTs = 0;
 let sceneStartElapsed = 0;
 let activeCaptionTimer = null;
 let activeNarrationScene = -1;
+let introNarration = null;
+let introHasPlayed = false;
 
 function interpolateLngLat(start, end, t){
   return [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t];
@@ -913,6 +915,7 @@ async function loadNarrationManifest(){
     narrationManifest = manifest
       .filter(item => Number.isFinite(item.scene) && typeof item.file === 'string')
       .sort((a,b) => a.scene - b.scene);
+    introNarration = narrationManifest.find(item => item.scene === 0) || null;
 
     const narrationByScene = new Map(narrationManifest.map(item => [item.scene, item]));
     sceneNarration = scenes.map((scene, index) => {
@@ -932,6 +935,25 @@ async function loadNarrationManifest(){
 function getSceneAudioFile(sceneIndex){
   const entry = narrationManifest.find(item => item.scene === sceneIndex + 1);
   return entry?.file || null;
+}
+
+function playIntroNarration(){
+  if(!playing || introHasPlayed || !introNarration?.file) return false;
+
+  const nextSrc = new URL(introNarration.file, window.location.href).toString();
+  if(narrationAudio.src !== nextSrc){
+    narrationAudio.src = nextSrc;
+  }
+
+  activeNarrationScene = -1;
+  narrationAudio.currentTime = 0;
+  narrationAudio.play().then(() => {
+    introHasPlayed = true;
+  }).catch(() => {
+    introHasPlayed = true;
+    playSceneNarration(currentScene);
+  });
+  return true;
 }
 
 function syncSceneVideos(){
@@ -1001,6 +1023,10 @@ function play(){
   playing=true;
   lastTs=0;
   syncSceneVideos();
+  if(playIntroNarration()){
+    requestAnimationFrame(tick);
+    return;
+  }
   if(activeNarrationScene === currentScene){
     narrationAudio.play().catch(() => {});
   } else {
@@ -1022,6 +1048,7 @@ function restart(){
   lastTs=0;
   sceneStartElapsed=0;
   activeNarrationScene = -1;
+  introHasPlayed = false;
   narrationAudio.pause();
   narrationAudio.currentTime = 0;
   showScene(0);
@@ -1036,6 +1063,10 @@ window.addEventListener('resize', resizeAllCharts);
 
 narrationAudio.addEventListener('ended', () => {
   if(!playing) return;
+  if(activeNarrationScene === -1 && introHasPlayed){
+    playSceneNarration(currentScene);
+    return;
+  }
   if(activeNarrationScene === currentScene){
     activeNarrationScene = -1;
     advanceScene();
