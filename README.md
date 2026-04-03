@@ -1,158 +1,36 @@
-# NX × AIonOS Motion Narrative: Deterministic Video Workflow
+# NX-Express-AIonOS-Pitch
 
-## 1) What the current code already does well
+## Truck animation troubleshooting (lane movement)
 
-The existing demo already has strong presentation fundamentals:
+If trucks are rendered but appear frozen on lanes, the most common root causes are:
 
-- High-quality scene composition and visual polish (cards, gradients, kinetic accents, chart styling).
-- Multi-scene narrative structure with clear pacing intent (`data-duration` on each scene).
-- Rich visuals already in place: canvas charts, SVG flow diagrams, transition states, and map/truck animation primitives.
-- Interactive transport controls (Play / Pause / Restart) and responsive layout behavior.
+1. **The JS bundle is duplicated in the same file**
+   - If the same `let`/`const` declarations (for example `let __DBG`, `const map`, `const trucks`) appear twice in one script, the browser throws a parse-time error such as:
+     - `Identifier 'map' has already been declared`
+   - In that case, **none of the animation code runs** (including `requestAnimationFrame(tick)`), so trucks never move.
 
-In short: the creative layer was already strong; the missing piece was deterministic rendering and export.
+2. **`requestAnimationFrame` loop not started**
+   - The movement loop must run continuously (`tick()`/`drawFrame()`) and update each truck's route progress (`t`).
 
-## 2) What prevented it from being a real video generator
+3. **Runtime error inside truck draw path**
+   - A render-time exception inside the loop can halt animation updates.
 
-The original implementation could not be treated as a production video pipeline because:
+### Reference behavior used in the map animation
 
-1. **Speech synthesis was non-deterministic**
-   Browser `speechSynthesis` voice selection, timing, rate, and availability vary by machine/browser/OS.
+A working setup typically does all of the following:
 
-2. **Scene timing depended on estimated word counts**
-   Durations were inferred from text length, not locked to actual narration audio.
+- Creates truck state (`latlon`, `seg`, `t`, `dir`, `speed`, `startAt`).
+- In each frame:
+  - Computes elapsed delta time (`dt`).
+  - Advances `t` by a step based on speed and segment length.
+  - Rolls to next segment when `t >= 1`.
+  - Draws truck at interpolated position with lane offset.
+- Schedules the next frame with `requestAnimationFrame(...)`.
 
-3. **Timeline state was runtime-driven, not frame-addressable**
-   Playback was tied to live `requestAnimationFrame` wall-clock progression, making exact re-rendering hard.
+### Quick checks
 
-4. **No deterministic export surface**
-   There was no render API to ask the page: "draw frame for exact time T".
+Open browser DevTools Console and verify there are no parse errors and no repeated declarations.
 
-5. **No FFmpeg-friendly output path**
-   No stable frame-sequence + audio mux workflow for reliable 1080p exports.
-
-## 3) Recommended architecture (implemented)
-
-Use a **single-source timeline** driven by pre-recorded narration metadata:
-
-- Replace speech synthesis with scene audio files (`assets/narration/scene-01.mp3` … `scene-05.mp3`).
-- Build scene durations from real audio metadata (`loadedmetadata`), not text estimates.
-- Keep a deterministic timeline with cumulative scene starts.
-- Add two runtime modes:
-  - **Preview mode**: real-time interactive playback with synchronized scene audio.
-  - **Export mode**: no live narration playback; expose `window.__NARRATIVE_EXPORT__` with:
-    - `getDuration()`
-    - `renderAt(timeSec)`
-- Export via **Playwright frame capture + FFmpeg mux**:
-  1. Render each frame at exact `t = frame / fps`.
-  2. Save `PNG` sequence.
-  3. Concatenate narration clips with FFmpeg.
-  4. Encode final H.264/AAC 1920×1080 MP4.
-
-This is deterministic, debuggable, and rerunnable.
-
----
-
-## What was implemented
-
-### Runtime changes
-
-- Removed browser speech synthesis behavior.
-- Added pre-recorded audio loading per scene.
-- Scene durations now come from narration file metadata.
-- Scene progression, caption typing, transitions, and map truck motion are driven by the same timeline.
-- Added export-mode layout support for fixed-size rendering (`?mode=export&width=1920&height=1080`).
-- Exposed deterministic render bridge at `window.__NARRATIVE_EXPORT__` for automation.
-
-### Export pipeline
-
-- Added `scripts/export-video.mjs`:
-  - starts static server
-  - launches headless Chromium via Playwright
-  - renders frame-by-frame in export mode
-  - writes PNG sequence
-  - concatenates narration clips with FFmpeg
-  - muxes final MP4 (`dist/narrative.mp4`)
-
-### Project setup
-
-- Added `package.json` scripts and Playwright dependency.
-- Added narration asset instructions in `assets/narration/README.md`.
-
----
-
-## Usage
-
-## Prerequisites
-
-- Node.js 20+
-- Python 3
-- FFmpeg available on `PATH`
-
-Install JS dependencies:
-
-```bash
-npm install
-```
-
-Install Playwright Chromium if needed:
-
-```bash
-npx playwright install chromium
-```
-
-Add narration assets:
-
-```text
-assets/narration/scene-01.mp3
-assets/narration/scene-02.mp3
-assets/narration/scene-03.mp3
-assets/narration/scene-04.mp3
-assets/narration/scene-05.mp3
-```
-
-## Preview mode (interactive)
-
-```bash
-npm run preview
-```
-
-Open:
-
-```text
-http://127.0.0.1:8000/index.html
-```
-
-## Export mode (deterministic 1920×1080)
-
-```bash
-npm run export:video
-```
-
-Output:
-
-```text
-dist/narrative.mp4
-```
-
-Optional environment overrides:
-
-- `FPS` (default `30`)
-- `WIDTH` (default `1920`)
-- `HEIGHT` (default `1080`)
-- `OUTPUT` (default `dist/narrative.mp4`)
-- `PORT` (default `4173`)
-
-Example:
-
-```bash
-FPS=60 WIDTH=1920 HEIGHT=1080 OUTPUT=dist/narrative-60fps.mp4 npm run export:video
-```
-
----
-
-## Why this is reliable
-
-- Export uses deterministic time stepping (`renderAt(t)`) rather than real-time screen recording.
-- Scene durations are derived from fixed audio files.
-- FFmpeg handles final encoding/muxing in a reproducible way.
-- The same authored HTML/CSS/SVG/canvas content is rendered; no rewrite into a different rendering stack.
+- ✅ Good: no `Identifier ... has already been declared` error.
+- ✅ Good: animation loop function is running every frame.
+- ✅ Good: truck list contains spawned trucks after scenario load.
