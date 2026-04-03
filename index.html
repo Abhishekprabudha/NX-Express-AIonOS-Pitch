@@ -513,24 +513,20 @@ let routeAnimationRaf = null;
 const truckMarkers = [];
 
 const BASE_WORDS_PER_SEC = 2.85;
-const VOICE_PITCH_MULTIPLIER = 1.4;
-const VOICE_RATE_MULTIPLIER = 0.98; // 30% slower than previous 1.4 baseline
-const sceneNarration = scenes.map(scene => scene.querySelector('.caption').dataset.caption);
-const estimatedSceneDurations = sceneNarration.map(text => Math.max(7, text.trim().split(/\s+/).length / BASE_WORDS_PER_SEC));
-const totalDuration = estimatedSceneDurations.reduce((sum,d)=>sum + d,0) + 3.4;
+let sceneNarration = scenes.map(scene => scene.querySelector('.caption').dataset.caption);
+let estimatedSceneDurations = sceneNarration.map(text => Math.max(7, text.trim().split(/\s+/).length / BASE_WORDS_PER_SEC));
 
+const narrationAudio = new Audio();
+narrationAudio.preload = 'auto';
+
+let narrationManifest = [];
 let currentScene = 0;
 let elapsed = 0;
 let playing = false;
 let lastTs = 0;
-let narrationStarted = false;
-let narrationRunning = false;
 let sceneStartElapsed = 0;
 let activeCaptionTimer = null;
-let narrationQueue = [];
-let activeNarrationIndex = -1;
-let voicesReady = false;
-let voicesRetryTimer = null;
+let activeNarrationScene = -1;
 
 function interpolateLngLat(start, end, t){
   return [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t];
@@ -907,112 +903,66 @@ function typeCaption(el, text, sceneDurationSec = 10){
   }, intervalMs);
 }
 
-function pickEnergeticMaleVoice(){
-  const voices = speechSynthesis.getVoices();
-  const britishMale = voices.find(v =>
-    /en-GB/i.test(v.lang || '') &&
-    /male|man|masculine|david|guy|ryan|brian|tom|alex|mark/i.test(v.name || '')
-  );
-  if(britishMale) return britishMale;
+async function loadNarrationManifest(){
+  try {
+    const res = await fetch('./assets/manifest.json', { cache: 'no-store' });
+    if(!res.ok) return;
+    const manifest = await res.json();
+    if(!Array.isArray(manifest) || !manifest.length) return;
 
-  return voices.find(v=>/Google UK English Male|Microsoft Ryan|Microsoft George|Daniel|Thomas|Arthur|Oliver/i.test(v.name))
-    || voices.find(v=>/en-GB/i.test(v.lang || ''))
-    || voices.find(v=>/male|man|masculine/i.test(v.name))
-    || voices[0];
+    narrationManifest = manifest
+      .filter(item => Number.isFinite(item.scene) && typeof item.file === 'string')
+      .sort((a,b) => a.scene - b.scene);
+
+    const narrationByScene = new Map(narrationManifest.map(item => [item.scene, item]));
+    sceneNarration = scenes.map((scene, index) => {
+      const captionEl = scene.querySelector('.caption');
+      const fallback = captionEl?.dataset.caption?.trim() || '';
+      const manifestText = narrationByScene.get(index + 1)?.text?.trim();
+      const resolvedText = manifestText || fallback;
+      if(captionEl) captionEl.dataset.caption = resolvedText;
+      return resolvedText;
+    });
+
+    estimatedSceneDurations = sceneNarration.map(text => Math.max(7, text.trim().split(/\s+/).length / BASE_WORDS_PER_SEC));
+  } catch (err) {
+  }
 }
 
-function ensureNarrationVoices(){
-  if(!('speechSynthesis' in window)) return;
-  const voices = window.speechSynthesis.getVoices();
-  voicesReady = Array.isArray(voices) && voices.length > 0;
-  if(voicesReady){
-    if(voicesRetryTimer){
-      clearTimeout(voicesRetryTimer);
-      voicesRetryTimer = null;
-    }
+function getSceneAudioFile(sceneIndex){
+  const entry = narrationManifest.find(item => item.scene === sceneIndex + 1);
+  return entry?.file || null;
+}
+
+function syncSceneVideos(){
+  scenes.forEach((scene, idx) => {
+    scene.querySelectorAll('video').forEach(video => {
+      if(idx === currentScene && playing){
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+    });
+  });
+}
+
+function playSceneNarration(sceneIndex){
+  if(!playing) return;
+  const audioFile = getSceneAudioFile(sceneIndex);
+  if(!audioFile){
+    activeNarrationScene = -1;
     return;
   }
-  if(!voicesRetryTimer){
-    voicesRetryTimer = setTimeout(() => {
-      voicesRetryTimer = null;
-      ensureNarrationVoices();
-    }, 250);
+
+  const nextSrc = new URL(audioFile, window.location.href).toString();
+  if(narrationAudio.src !== nextSrc){
+    narrationAudio.src = nextSrc;
   }
-}
-
-function queueNarration(){
-  if(!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance !== 'function') return;
-  window.speechSynthesis.cancel();
-  narrationQueue = [];
-  activeNarrationIndex = -1;
-
-  const intro = new SpeechSynthesisUtterance('Good Morning');
-  intro.lang = 'en-GB';
-  intro.rate = Math.min(10, 1.04 * VOICE_RATE_MULTIPLIER);
-  intro.pitch = Math.min(2, 1.22 * VOICE_PITCH_MULTIPLIER);
-  intro.volume = 1;
-  const introVoice = pickEnergeticMaleVoice();
-  if(introVoice) intro.voice = introVoice;
-  intro.onstart = () => {
-    narrationRunning = true;
-    activeNarrationIndex = -1;
-  };
-  intro.onend = () => {
-    if(activeNarrationIndex < 0 && playing){
-      showScene(0);
-      sceneStartElapsed = elapsed;
-    }
-  };
-  narrationQueue.push(intro);
-
-  sceneNarration.forEach((baseText, sceneIndex) => {
-    const energeticLead = sceneIndex === 0
-      ? 'Hi everyone, welcome. Let\'s dive in with energy.'
-      : '';
-    const payload = `${energeticLead} ${baseText}`.trim();
-    const pitch = 1.18 + ((sceneIndex % 3) * 0.08);
-    const rate = 1.02 + ((sceneIndex % 2) * 0.05);
-    const u = new SpeechSynthesisUtterance(payload);
-    u.lang = 'en-GB';
-    u.rate = Math.min(10, rate * VOICE_RATE_MULTIPLIER);
-    u.pitch = Math.min(2, pitch * VOICE_PITCH_MULTIPLIER);
-    u.volume = 1;
-    const voice = pickEnergeticMaleVoice();
-    if(voice) u.voice = voice;
-    u.onstart = () => {
-      if(!playing) return;
-      narrationRunning = true;
-      activeNarrationIndex = sceneIndex;
-      if(sceneIndex !== currentScene){
-        currentScene = sceneIndex;
-      }
-      showScene(currentScene);
-      sceneStartElapsed = elapsed;
-    };
-    u.onend = () => {
-      if(activeNarrationIndex === sceneIndex){
-        activeNarrationIndex = -1;
-      }
-      if(sceneIndex === scenes.length - 1){
-        narrationRunning = false;
-        playing = false;
-      }
-    };
-    narrationQueue.push(u);
+  activeNarrationScene = sceneIndex;
+  narrationAudio.currentTime = 0;
+  narrationAudio.play().catch(() => {
+    activeNarrationScene = -1;
   });
-
-  narrationQueue.forEach((u) => window.speechSynthesis.speak(u));
-}
-
-function startNarrationIfNeeded(){
-  if(narrationStarted) return;
-  narrationStarted = true;
-  if('speechSynthesis' in window){
-    ensureNarrationVoices();
-    if(voicesReady){
-      queueNarration();
-    }
-  }
 }
 
 function advanceScene(){
@@ -1020,10 +970,15 @@ function advanceScene(){
   if(currentScene>=scenes.length){
     playing=false;
     currentScene=scenes.length-1;
+    narrationAudio.pause();
+    activeNarrationScene = -1;
+    syncSceneVideos();
     return;
   }
   showScene(currentScene);
   sceneStartElapsed = elapsed;
+  syncSceneVideos();
+  playSceneNarration(currentScene);
 }
 
 function tick(ts){
@@ -1032,9 +987,9 @@ function tick(ts){
   const delta=(ts-lastTs)/1000;
   lastTs=ts;
   elapsed+=delta;
-  const pct=Math.min(100,(elapsed/totalDuration)*100);
 
-  if(!('speechSynthesis' in window) && elapsed - sceneStartElapsed >= (estimatedSceneDurations[currentScene] || 10)){
+  const fallbackDuration = estimatedSceneDurations[currentScene] || 10;
+  if(activeNarrationScene !== currentScene && elapsed - sceneStartElapsed >= fallbackDuration){
     advanceScene();
   }
 
@@ -1045,52 +1000,57 @@ function play(){
   if(playing) return;
   playing=true;
   lastTs=0;
-  startNarrationIfNeeded();
-  if('speechSynthesis' in window){
-    window.speechSynthesis.resume();
-    ensureNarrationVoices();
-    if(!narrationRunning && narrationStarted && voicesReady){
-      queueNarration();
-    }
+  syncSceneVideos();
+  if(activeNarrationScene === currentScene){
+    narrationAudio.play().catch(() => {});
+  } else {
+    playSceneNarration(currentScene);
   }
   requestAnimationFrame(tick);
 }
+
 function pause(){
   playing=false;
-  window.speechSynthesis?.pause();
+  narrationAudio.pause();
+  syncSceneVideos();
 }
+
 function restart(){
   playing=false;
   elapsed=0;
   currentScene=0;
   lastTs=0;
   sceneStartElapsed=0;
-  narrationStarted = false;
-  narrationRunning = false;
-  narrationQueue = [];
-  activeNarrationIndex = -1;
-  window.speechSynthesis?.cancel();
+  activeNarrationScene = -1;
+  narrationAudio.pause();
+  narrationAudio.currentTime = 0;
   showScene(0);
+  syncSceneVideos();
   play();
 }
 
-playBtn.onclick=()=>{window.speechSynthesis?.resume(); play();};
+playBtn.onclick=()=>play();
 pauseBtn.onclick=()=>pause();
 restartBtn.onclick=()=>restart();
 window.addEventListener('resize', resizeAllCharts);
-if('speechSynthesis' in window){
-  window.speechSynthesis.onvoiceschanged = () => {
-    ensureNarrationVoices();
-    if(playing && narrationStarted && !narrationRunning){
-      queueNarration();
-    }
-  };
-  ensureNarrationVoices();
-}
+
+narrationAudio.addEventListener('ended', () => {
+  if(!playing) return;
+  if(activeNarrationScene === currentScene){
+    activeNarrationScene = -1;
+    advanceScene();
+  }
+});
+
+narrationAudio.addEventListener('error', () => {
+  activeNarrationScene = -1;
+});
 
 initIndiaMap();
 resizeAllCharts();
 showScene(0);
+syncSceneVideos();
+loadNarrationManifest();
 </script>
 </body>
 </html>
