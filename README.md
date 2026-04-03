@@ -34,3 +34,23 @@ Open browser DevTools Console and verify there are no parse errors and no repeat
 - ✅ Good: no `Identifier ... has already been declared` error.
 - ✅ Good: animation loop function is running every frame.
 - ✅ Good: truck list contains spawned trucks after scenario load.
+
+
+## Scene-by-scene narration MP3 export
+
+You can generate narration audio for each scene caption in `index.html` using Python:
+
+```bash
+pip install edge-tts
+python scripts_generate_scene_narration.py
+```
+
+This creates:
+- `assets/scene_01.mp3`, `scene_02.mp3`, ...
+- `assets/manifest.json` (scene text + file mapping)
+
+Optional voice tuning:
+
+```bash
+python scripts_generate_scene_narration.py --voice en-US-GuyNeural --rate +8% --pitch +2Hz
+```
