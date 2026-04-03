@@ -951,6 +951,7 @@ function playIntroNarration(){
     introHasPlayed = true;
   }).catch(() => {
     introHasPlayed = true;
+    sceneStartElapsed = elapsed;
     playSceneNarration(currentScene);
   });
   return true;
@@ -1008,6 +1009,10 @@ function tick(ts){
   if(!lastTs) lastTs=ts;
   const delta=(ts-lastTs)/1000;
   lastTs=ts;
+  if(introNarration?.file && !introHasPlayed){
+    requestAnimationFrame(tick);
+    return;
+  }
   elapsed+=delta;
 
   const fallbackDuration = estimatedSceneDurations[currentScene] || 10;
@@ -1064,6 +1069,7 @@ window.addEventListener('resize', resizeAllCharts);
 narrationAudio.addEventListener('ended', () => {
   if(!playing) return;
   if(activeNarrationScene === -1 && introHasPlayed){
+    sceneStartElapsed = elapsed;
     playSceneNarration(currentScene);
     return;
   }
