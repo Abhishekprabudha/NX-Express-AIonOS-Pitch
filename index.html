@@ -529,6 +529,8 @@ let sceneStartElapsed = 0;
 let activeCaptionTimer = null;
 let narrationQueue = [];
 let activeNarrationIndex = -1;
+let voicesReady = false;
+let voicesRetryTimer = null;
 
 function interpolateLngLat(start, end, t){
   return [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t];
@@ -919,8 +921,27 @@ function pickEnergeticMaleVoice(){
     || voices[0];
 }
 
-function queueNarration(){
+function ensureNarrationVoices(){
   if(!('speechSynthesis' in window)) return;
+  const voices = window.speechSynthesis.getVoices();
+  voicesReady = Array.isArray(voices) && voices.length > 0;
+  if(voicesReady){
+    if(voicesRetryTimer){
+      clearTimeout(voicesRetryTimer);
+      voicesRetryTimer = null;
+    }
+    return;
+  }
+  if(!voicesRetryTimer){
+    voicesRetryTimer = setTimeout(() => {
+      voicesRetryTimer = null;
+      ensureNarrationVoices();
+    }, 250);
+  }
+}
+
+function queueNarration(){
+  if(!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance !== 'function') return;
   window.speechSynthesis.cancel();
   narrationQueue = [];
   activeNarrationIndex = -1;
@@ -987,7 +1008,10 @@ function startNarrationIfNeeded(){
   if(narrationStarted) return;
   narrationStarted = true;
   if('speechSynthesis' in window){
-    queueNarration();
+    ensureNarrationVoices();
+    if(voicesReady){
+      queueNarration();
+    }
   }
 }
 
@@ -1024,7 +1048,8 @@ function play(){
   startNarrationIfNeeded();
   if('speechSynthesis' in window){
     window.speechSynthesis.resume();
-    if(!narrationRunning && narrationStarted){
+    ensureNarrationVoices();
+    if(!narrationRunning && narrationStarted && voicesReady){
       queueNarration();
     }
   }
@@ -1053,7 +1078,15 @@ playBtn.onclick=()=>{window.speechSynthesis?.resume(); play();};
 pauseBtn.onclick=()=>pause();
 restartBtn.onclick=()=>restart();
 window.addEventListener('resize', resizeAllCharts);
-window.speechSynthesis?.onvoiceschanged?.();
+if('speechSynthesis' in window){
+  window.speechSynthesis.onvoiceschanged = () => {
+    ensureNarrationVoices();
+    if(playing && narrationStarted && !narrationRunning){
+      queueNarration();
+    }
+  };
+  ensureNarrationVoices();
+}
 
 initIndiaMap();
 resizeAllCharts();
