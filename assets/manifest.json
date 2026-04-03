@@ -1,0 +1,32 @@
+[
+  {
+    "scene": 1,
+    "file": "assets/scene_01.mp3",
+    "text": "NX is entering a defining phase in India. Growth will not be won by adding capacity alone. It will be won by making every shipment, warehouse task, and customer promise more intelligent, more predictable, and more profitable.",
+    "word_count": 37
+  },
+  {
+    "scene": 2,
+    "file": "assets/scene_02.mp3",
+    "text": "This is not a story about software. It is a story about certainty. When NX improves precision in logistics, the manufacturer avoids downtime, the retailer avoids stock-outs, and the end customer simply experiences reliability.",
+    "word_count": 34
+  },
+  {
+    "scene": 3,
+    "file": "assets/scene_03.mp3",
+    "text": "Growth creates three simultaneous pressure points: warehouse orchestration becomes harder, visibility remains descriptive instead of prescriptive, and last-mile operations become more volatile. This is where margin and trust begin to leak.",
+    "word_count": 31
+  },
+  {
+    "scene": 4,
+    "file": "assets/scene_04.mp3",
+    "text": "For NX, AIonOS would focus on three outcomes: smarter warehouse execution, decision-grade visibility, and sharper last-mile control. The value is not more reporting. The value is faster, earlier, better action.",
+    "word_count": 30
+  },
+  {
+    "scene": 5,
+    "file": "assets/scene_05.mp3",
+    "text": "Our request is simple: in the next two weeks, align on one pilot scope, one metric, and one start date. This is not about exploring AI in the abstract; it is about jointly proving how intelligent operations can improve an existing baseline fastest.",
+    "word_count": 43
+  }
+]
