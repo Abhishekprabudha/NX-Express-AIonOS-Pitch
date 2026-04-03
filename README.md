@@ -64,8 +64,9 @@ If you are working directly in the GitHub web UI, you can run narration generati
 3. Click **Run workflow**.
 4. (Optional) Set `voice`, `rate`, and `pitch` inputs.
 5. Run it and wait for completion.
-6. Open the workflow run and download the `scene-narration-mp3` artifact.
+6. On successful completion, the workflow commits generated files back to the selected branch in `assets/`.
+7. (Optional) Open the workflow run and download the `scene-narration-mp3` artifact.
 
-The artifact contains generated files from `assets/`:
+The commit/artifact contains generated files from `assets/`:
 - `scene_01.mp3`, `scene_02.mp3`, ...
 - `manifest.json`
