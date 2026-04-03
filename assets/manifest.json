@@ -1,5 +1,11 @@
 [
   {
+    "scene": 0,
+    "file": "assets/intro_00.mp3",
+    "text": "Hello, welcome. NX Express represents the kind of logistics institution that customers rely on when precision, resilience, and trust truly matter. Whether globally or in India, its real strength lies in converting operational excellence into business confidence for every customer it serves.",
+    "word_count": 42
+  },
+  {
     "scene": 1,
     "file": "assets/scene_01.mp3",
     "text": "NX is entering a defining phase in India. Growth will not be won by adding capacity alone. It will be won by making every shipment, warehouse task, and customer promise more intelligent, more predictable, and more profitable.",
