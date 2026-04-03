@@ -17,6 +17,11 @@ import re
 from pathlib import Path
 
 CAPTION_PATTERN = re.compile(r'data-caption="(.*?)"', re.DOTALL)
+INTRO_TEXT = (
+    "Hello, welcome. NX Express represents the kind of logistics institution that customers rely on "
+    "when precision, resilience, and trust truly matter. Whether globally or in India, its real strength "
+    "lies in converting operational excellence into business confidence for every customer it serves."
+)
 
 
 def extract_captions(index_path: Path) -> list[str]:
@@ -42,6 +47,18 @@ async def synthesize_scene_mp3(text: str, output_file: Path, voice: str, rate: s
 async def main_async(args: argparse.Namespace) -> None:
     captions = extract_captions(args.index)
     manifest: list[dict[str, str | int]] = []
+
+    intro_file = args.out_dir / "intro_00.mp3"
+    print(f"Generating {intro_file}...")
+    await synthesize_scene_mp3(INTRO_TEXT, intro_file, args.voice, args.rate, args.pitch)
+    manifest.append(
+        {
+            "scene": 0,
+            "file": str(intro_file),
+            "text": INTRO_TEXT,
+            "word_count": len(INTRO_TEXT.split()),
+        }
+    )
 
     for i, caption in enumerate(captions, start=1):
         out_file = args.out_dir / f"scene_{i:02d}.mp3"

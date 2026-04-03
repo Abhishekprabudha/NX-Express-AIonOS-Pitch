@@ -51,7 +51,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           shopt -s nullglob
-          files=(assets/scene_*.mp3 assets/manifest.json)
+          files=(assets/intro_00.mp3 assets/scene_*.mp3 assets/manifest.json)
 
           if [ ${#files[@]} -eq 0 ]; then
             echo "No generated files found in assets/."
@@ -73,6 +73,7 @@ jobs:
         with:
           name: scene-narration-mp3
           path: |
+            assets/intro_00.mp3
             assets/scene_*.mp3
             assets/manifest.json
           if-no-files-found: error
