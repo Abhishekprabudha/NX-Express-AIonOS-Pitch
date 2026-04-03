@@ -529,6 +529,7 @@ let activeCaptionTimer = null;
 let activeNarrationScene = -1;
 let introNarration = null;
 let introHasPlayed = false;
+let sceneNarrationFailed = new Set();
 
 function interpolateLngLat(start, end, t){
   return [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t];
@@ -974,9 +975,11 @@ function playSceneNarration(sceneIndex){
   const audioFile = getSceneAudioFile(sceneIndex);
   if(!audioFile){
     activeNarrationScene = -1;
+    sceneNarrationFailed.add(sceneIndex);
     return;
   }
 
+  sceneNarrationFailed.delete(sceneIndex);
   const nextSrc = new URL(audioFile, window.location.href).toString();
   if(narrationAudio.src !== nextSrc){
     narrationAudio.src = nextSrc;
@@ -985,6 +988,7 @@ function playSceneNarration(sceneIndex){
   narrationAudio.currentTime = 0;
   narrationAudio.play().catch(() => {
     activeNarrationScene = -1;
+    sceneNarrationFailed.add(sceneIndex);
   });
 }
 
@@ -1016,7 +1020,9 @@ function tick(ts){
   elapsed+=delta;
 
   const fallbackDuration = estimatedSceneDurations[currentScene] || 10;
-  if(activeNarrationScene !== currentScene && elapsed - sceneStartElapsed >= fallbackDuration){
+  const hasSceneAudio = !!getSceneAudioFile(currentScene);
+  const shouldUseFallbackTimer = !hasSceneAudio || sceneNarrationFailed.has(currentScene);
+  if(shouldUseFallbackTimer && elapsed - sceneStartElapsed >= fallbackDuration){
     advanceScene();
   }
 
@@ -1054,6 +1060,7 @@ function restart(){
   sceneStartElapsed=0;
   activeNarrationScene = -1;
   introHasPlayed = false;
+  sceneNarrationFailed.clear();
   narrationAudio.pause();
   narrationAudio.currentTime = 0;
   showScene(0);
@@ -1080,6 +1087,9 @@ narrationAudio.addEventListener('ended', () => {
 });
 
 narrationAudio.addEventListener('error', () => {
+  if(activeNarrationScene >= 0){
+    sceneNarrationFailed.add(activeNarrationScene);
+  }
   activeNarrationScene = -1;
 });
 
